@@ -1,0 +1,7 @@
+# Local environment and runtime artifacts — never published.
+.venv/
+__pycache__/
+*.pyc
+
+# Written at runtime and contains local paths.
+hotkey-hq.log

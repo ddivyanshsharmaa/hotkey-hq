@@ -1,0 +1,3 @@
+# Pinned to a major version: an unpinned install would silently pick up a future
+# breaking release of pywebview on some machine months from now.
+pywebview>=5.0,<6.0

@@ -1,0 +1,1811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hotkey HQ</title>
+<!-- The server rewrites these when it serves the page. Opened straight off disk
+     they stay as placeholders, the API calls are refused, and the page falls
+     back to showing you the JSON to paste in yourself. -->
+<meta name="hkhq-token" content="__HKHQ_TOKEN__">
+<meta name="hkhq-version" content="__HKHQ_VERSION__">
+<meta name="hkhq-verified" content="__HKHQ_VERIFIED__">
+<link rel="icon" href="/icon.ico">
+<style>
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+
+  :root {
+    --mono: "Cascadia Code", "Cascadia Mono", Consolas, ui-monospace, "Courier New", monospace;
+    --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+    --bg:          #e7e9e4;
+    --surface:     #f6f7f4;
+    --surface-2:   #eff1ec;
+    --tray:        #d3d6cd;
+    --line:        #c9cdc2;
+    --line-soft:   #dcdfd6;
+    --keycap:      #fcfdfa;
+    --keycap-mod:  #e0e3da;
+    --keycap-edge: #c2c6ba;
+    --ink:         #1b1e1a;
+    --ink-soft:    #4d524a;
+    --ink-faint:   #838a7d;
+    --code-bg:     #23261f;
+    --code-ink:    #eef0e8;
+
+    --L-claude:   #b0491f;
+    --L-vscode:   #1c6aad;
+    --L-windows:  #0d6f63;
+    --L-text:     #6b6357;
+    --L-shell:    #67489f;
+    --L-custom:   #7a7420;
+    --L-powertoys:#a8306f;
+    --lit-ink:    #ffffff;
+
+    --shadow-key: 0 2px 0 var(--keycap-edge);
+    --shadow-panel: 0 1px 2px rgba(27,30,26,.05), 0 8px 24px rgba(27,30,26,.06);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --bg:#15171a; --surface:#1e2125; --surface-2:#24272b; --tray:#0e1013; --line:#33373c;
+      --line-soft:#2a2e32; --keycap:#2b2f34; --keycap-mod:#1f2327; --keycap-edge:#121417;
+      --ink:#e9ebe6; --ink-soft:#b0b5ac; --ink-faint:#7b8179; --code-bg:#0e1013; --code-ink:#e4e7de;
+      --L-claude:#f0906b; --L-vscode:#6fb7e8; --L-windows:#4ecab8; --L-text:#a89e90;
+      --L-shell:#b49ae8; --L-custom:#c9c15e; --L-powertoys:#f08cc0; --lit-ink:#15171a;
+      --shadow-key: 0 2px 0 var(--keycap-edge);
+      --shadow-panel: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#15171a; --surface:#1e2125; --surface-2:#24272b; --tray:#0e1013; --line:#33373c;
+    --line-soft:#2a2e32; --keycap:#2b2f34; --keycap-mod:#1f2327; --keycap-edge:#121417;
+    --ink:#e9ebe6; --ink-soft:#b0b5ac; --ink-faint:#7b8179; --code-bg:#0e1013; --code-ink:#e4e7de;
+    --L-claude:#f0906b; --L-vscode:#6fb7e8; --L-windows:#4ecab8; --L-text:#a89e90;
+    --L-shell:#b49ae8; --L-custom:#c9c15e; --L-powertoys:#f08cc0; --lit-ink:#15171a;
+    --shadow-key: 0 2px 0 var(--keycap-edge);
+    --shadow-panel: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible { outline: 2px solid var(--L-vscode); outline-offset: 2px; border-radius: 4px; }
+
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 40px 22px 90px; }
+
+  /* ---------- masthead ---------- */
+  .mast { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; margin-bottom:26px; }
+  .mast h1 {
+    font-family: var(--mono); font-weight:700; font-size: clamp(24px,3.4vw,34px);
+    letter-spacing:-.02em; margin:0 0 6px; text-wrap:balance;
+  }
+  .mast p { margin:0; color:var(--ink-soft); font-size:14px; max-width:60ch; }
+  .mast p code { font-family:var(--mono); font-size:.92em; }
+
+  .btn {
+    font-family:var(--sans); font-size:12.5px; font-weight:600;
+    padding:7px 13px; border-radius:7px; cursor:pointer;
+    border:1px solid var(--line); background:var(--surface); color:var(--ink-soft);
+    white-space:nowrap;
+  }
+  .btn:hover { color:var(--ink); border-color:var(--ink-faint); }
+  .btn.primary { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+  .btn.primary:hover { opacity:.88; color:var(--bg); }
+  .btn.capture-on { color:#fff; background:var(--L-claude); border-color:var(--L-claude); }
+  .btn.capture-on:hover { color:#fff; opacity:.9; }
+  :root[data-theme="dark"] .btn.capture-on { color:#15171a; }
+
+  /* ---------- readout ---------- */
+  .readout {
+    position: sticky; top:0; z-index:30;
+    background:var(--surface); border:1px solid var(--line);
+    border-radius:12px; padding:16px 18px; margin-bottom:16px;
+    box-shadow: var(--shadow-panel);
+    border-left:5px solid var(--ink-faint);
+  }
+  .readout[data-tone="claude"]  { border-left-color:var(--L-claude); }
+  .readout[data-tone="vscode"]  { border-left-color:var(--L-vscode); }
+  .readout[data-tone="windows"] { border-left-color:var(--L-windows); }
+  .readout[data-tone="text"]    { border-left-color:var(--L-text); }
+  .readout[data-tone="shell"]   { border-left-color:var(--L-shell); }
+  .readout[data-tone="custom"]  { border-left-color:var(--L-custom); }
+  .readout[data-tone="none"]    { border-left-color:var(--ink-faint); border-left-style:dashed; }
+
+  .ro-hint { font-size:13.5px; color:var(--ink-soft); margin:0; }
+  .ro-combo {
+    font-family:var(--mono); font-weight:700; font-size:20px; letter-spacing:-.01em;
+    color:var(--ink); margin:0 0 2px;
+  }
+  .ro-sub { font-size:12.5px; color:var(--ink-faint); margin:0 0 10px; }
+  .ro-list { display:flex; flex-direction:column; gap:7px; margin:0; padding:0; list-style:none; }
+
+  /* Combo-grouped list: the key combination on the left, everything that
+     claims it stacked on the right, winner first. */
+  .kv { display:flex; flex-direction:column; }
+  .kv-row {
+    display:grid; grid-template-columns:minmax(130px,max-content) 1fr; gap:6px 18px;
+    padding:9px 0; border-top:1px solid var(--line-soft); align-items:baseline;
+  }
+  .kv-row:first-child { border-top:none; }
+  .kv-combo {
+    font-family:var(--mono); font-size:13px; font-weight:600; color:var(--ink);
+    white-space:nowrap;
+  }
+  .kv-combo .step { color:var(--ink-faint); font-weight:400; }
+  .kv-claims { display:flex; flex-direction:column; gap:7px; min-width:0; }
+  .kv-claim { display:flex; gap:9px; align-items:baseline; }
+  .kv-claim .lchip { font-size:9.5px; padding:2px 6px; }
+  .kv-claim .body { min-width:0; }
+  .kv-claim .what { font-size:13.5px; color:var(--ink); }
+  .kv-claim .why { display:block; font-size:12px; color:var(--ink-faint); margin-top:1px; }
+  .kv-claim.loses .what { color:var(--ink-soft); }
+  .kv-claim.loses .lchip { opacity:.55; }
+  .kv-beaten { font-size:11.5px; color:var(--ink-faint); font-style:italic; }
+
+  @media (max-width:640px) { .kv-row { grid-template-columns:1fr; } }
+  .ro-item { display:flex; gap:10px; align-items:flex-start; font-size:13.5px; }
+  .ro-item .lchip { margin-top:1px; }
+  .ro-item .what { color:var(--ink); }
+  .ro-item .why  { color:var(--ink-faint); font-size:12.5px; display:block; }
+  .ro-item.wins .what { font-weight:600; }
+  .ro-wins-note { font-size:12px; color:var(--ink-faint); margin:9px 0 0; }
+  .ro-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:12px; }
+  .ro-actions label { font-size:12.5px; color:var(--ink-soft); display:flex; align-items:center; gap:6px; }
+  select, input[type="text"] {
+    font-family:var(--sans); font-size:13px; padding:6px 9px;
+    border-radius:6px; border:1px solid var(--line);
+    background:var(--bg); color:var(--ink);
+  }
+  .snippet {
+    background:var(--code-bg); color:var(--code-ink); font-family:var(--mono);
+    font-size:12px; line-height:1.55; padding:12px 14px; border-radius:8px;
+    margin:10px 0 0; overflow-x:auto; white-space:pre;
+  }
+
+  /* ---------- layer chips ---------- */
+  .lchip {
+    display:inline-flex; align-items:center; gap:5px;
+    font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.02em;
+    padding:3px 7px; border-radius:5px; color:#fff; white-space:nowrap; flex:none;
+  }
+  .lchip[data-l="claude"]  { background:var(--L-claude); }
+  .lchip[data-l="vscode"]  { background:var(--L-vscode); }
+  .lchip[data-l="windows"] { background:var(--L-windows); }
+  .lchip[data-l="text"]    { background:var(--L-text); }
+  .lchip[data-l="shell"]   { background:var(--L-shell); }
+  .lchip[data-l="custom"]  { background:var(--L-custom); }
+  .lchip[data-l="powertoys"]{ background:var(--L-powertoys); }
+  :root[data-theme="dark"] .lchip, :root:not([data-theme]) .lchip { color:#15171a; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme]) .lchip { color:#fff; } }
+  :root[data-theme="light"] .lchip { color:#fff; }
+
+  .filters { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px; }
+  .filters .flabel { font-size:12px; color:var(--ink-faint); font-family:var(--mono); text-transform:uppercase; letter-spacing:.09em; margin-right:2px; }
+  .fchip {
+    display:inline-flex; align-items:center; gap:7px; cursor:pointer;
+    font-size:12.5px; font-weight:600; padding:6px 11px 6px 8px;
+    border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--ink-soft);
+    user-select:none;
+  }
+  .fchip .dot { width:10px; height:10px; border-radius:3px; flex:none; }
+  .fchip[aria-pressed="true"] { color:var(--ink); border-color:var(--ink-faint); background:var(--surface-2); }
+  .fchip[aria-pressed="false"] { opacity:.45; }
+  .fchip[aria-pressed="false"] .dot { background:var(--ink-faint) !important; }
+  .fchip .cnt { font-family:var(--mono); font-size:10.5px; color:var(--ink-faint); }
+
+  /* ---------- keyboard ---------- */
+  .kb-scroll { overflow-x:auto; padding:2px 2px 6px; margin-bottom:10px; }
+  .kb-tray { background:var(--tray); border-radius:16px; padding:18px; display:inline-block; min-width:100%; }
+  .kb {
+    --u: 42px; --g: 6px; --cols: 15;
+    display:flex; flex-direction:column; gap:var(--g);
+    width: calc(var(--u) * var(--cols) + var(--g) * (var(--cols) - 1));
+    margin:0 auto;
+  }
+  .kspace { width: calc(var(--u) * var(--w) + var(--g) * (var(--w) - 1)); flex:none; }
+  /* Fn is resolved in keyboard firmware and never reaches Windows, so it can
+     never light up. Style it as visibly "not observable" rather than leaving it
+     looking like a normal key that seems broken. */
+  .key.fnkey {
+    border-style:dashed; border-color:var(--L-powertoys); cursor:help;
+    background:
+      repeating-linear-gradient(135deg,
+        transparent 0 4px,
+        color-mix(in srgb, var(--L-powertoys) 14%, transparent) 4px 8px),
+      var(--keycap-mod);
+  }
+  .key.fnkey .cap { color:var(--L-powertoys); font-style:italic; }
+  .key.fnkey.dim { opacity:1; }   /* never dim it — it is always "unavailable", not "inactive" */
+  .key.fnshared .fnbadge {
+    position:absolute; top:3px; right:4px;
+    font-family:var(--mono); font-size:7.5px; line-height:1;
+    color:var(--ink-faint); border:1px solid var(--line); border-radius:3px;
+    padding:1px 2px; pointer-events:none;
+  }
+  .key.fnshared.lit .fnbadge { color:var(--lit-ink); border-color:var(--lit-ink); opacity:.7; }
+  .krow { display:flex; gap:var(--g); }
+  .key {
+    --w: 1;
+    width: calc(var(--u) * var(--w) + var(--g) * (var(--w) - 1));
+    height: var(--u);
+    position:relative;
+    background:var(--keycap);
+    border:1px solid var(--keycap-edge);
+    border-radius:6px;
+    box-shadow: var(--shadow-key);
+    display:flex; align-items:flex-end; padding:4px 5px;
+    flex:none;
+    transition: box-shadow .1s, transform .06s;
+  }
+  .key.mod { background:var(--keycap-mod); }
+  .key .cap {
+    font-family:var(--mono); font-size:11px; color:var(--ink); line-height:1;
+  }
+  .key.mod .cap { color:var(--ink-soft); font-size:9.5px; }
+  .key.wide .cap { font-size:9.5px; color:var(--ink-faint); }
+  .key.held { transform: translateY(1px); box-shadow:none; border-color:var(--ink-faint); }
+
+  /* Resting state: a key wears one dot per layer that binds it, and a count.
+     No modifier glyphs — Mac symbols (⌃⌥⇧⊞) have no glyph in Windows mono fonts
+     and render as tofu boxes. Detail lives in the tooltip, click and hold-preview. */
+  .ktags { position:absolute; top:4px; left:5px; right:5px; display:flex; gap:2px; align-items:center; pointer-events:none; }
+  .kdot { width:5px; height:5px; border-radius:50%; flex:none; }
+  .kdot[data-l="claude"]   { background:var(--L-claude); }
+  .kdot[data-l="vscode"]   { background:var(--L-vscode); }
+  .kdot[data-l="windows"]  { background:var(--L-windows); }
+  .kdot[data-l="text"]     { background:var(--L-text); }
+  .kdot[data-l="shell"]    { background:var(--L-shell); }
+  .kdot[data-l="custom"]   { background:var(--L-custom); }
+  .kdot[data-l="powertoys"]{ background:var(--L-powertoys); }
+  .kcount { margin-left:auto; font-family:var(--mono); font-size:8.5px; line-height:1; color:var(--ink-faint); }
+
+  .key[data-key] { cursor:pointer; }
+  .key[data-key]:hover { border-color:var(--ink-faint); }
+
+  /* Hold a modifier: every key that has a binding for exactly those modifiers lights up. */
+  .key.lit { background:var(--lit); border-color:var(--lit); }
+  .key.lit .cap { color:var(--lit-ink); font-weight:600; }
+  .key.lit .kcount { color:var(--lit-ink); opacity:.75; }
+  .key.lit .kdot { display:none; }
+  .key.dim { opacity:.42; }
+
+  .key.hit { box-shadow: 0 0 0 2px var(--ink), var(--shadow-key); }
+  .key.miss { box-shadow: 0 0 0 2px var(--ink-faint), var(--shadow-key); border-style:dashed; }
+
+  .probe {
+    display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+    background:var(--surface-2); border:1px solid var(--line); border-radius:8px;
+    padding:8px 12px; margin:0 0 10px; font-family:var(--mono); font-size:12px;
+  }
+  .probe-label {
+    font-size:9.5px; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--ink-faint); flex:none;
+  }
+  .probe-body { color:var(--ink-soft); }
+  .probe-body b { color:var(--ink); font-weight:600; }
+  .probe-body .on  { color:var(--L-claude); font-weight:600; }
+  .probe-body .off { color:var(--ink-faint); opacity:.5; }
+  .probe-warn { color:var(--L-powertoys); }
+  body.unfocused .probe { border-color:var(--L-powertoys); border-style:dashed; }
+  body.unfocused .kb-tray { opacity:.55; }
+
+  .kb-note { font-size:12px; color:var(--ink-faint); margin:0 0 34px; }
+  .kb-note kbd { font-family:var(--mono); font-size:11px; background:var(--surface); border:1px solid var(--line); padding:1px 5px; border-radius:4px; color:var(--ink-soft); }
+
+  /* ---------- table ---------- */
+  h2 {
+    font-family:var(--mono); font-size:12px; text-transform:uppercase; letter-spacing:.11em;
+    color:var(--ink-faint); margin:0 0 12px; padding-bottom:9px; border-bottom:1px solid var(--line);
+  }
+  .tbl-head { display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+  .tbl-head input[type="text"] { flex:1 1 220px; }
+  .tbl-count { font-family:var(--mono); font-size:11.5px; color:var(--ink-faint); }
+
+  .rows { display:flex; flex-direction:column; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .row {
+    display:grid; grid-template-columns: 190px 92px 1fr; gap:12px; align-items:baseline;
+    padding:9px 14px; background:var(--surface); border-bottom:1px solid var(--line-soft); font-size:13.5px;
+  }
+  .row:last-child { border-bottom:none; }
+  .row:nth-child(even) { background:var(--surface-2); }
+  .row .rk { font-family:var(--mono); font-size:12px; font-weight:600; color:var(--ink); }
+  .row .rd { color:var(--ink-soft); }
+  .row .rd em { font-style:normal; color:var(--ink-faint); font-size:12.5px; display:block; }
+  .empty { padding:22px 14px; text-align:center; color:var(--ink-faint); font-size:13.5px; background:var(--surface); }
+
+  /* ---------- callout ---------- */
+  .callout {
+    border:1px solid var(--line); border-left:4px solid var(--L-windows);
+    background:var(--surface); border-radius:10px; padding:15px 17px; margin-top:34px;
+  }
+  .callout h3 { margin:0 0 9px; font-size:14px; }
+  .callout ul { margin:0; padding-left:19px; display:flex; flex-direction:column; gap:7px; font-size:13.5px; color:var(--ink-soft); }
+  .callout strong { color:var(--ink); }
+  .callout code, .foot code { font-family:var(--mono); font-size:.92em; background:var(--surface-2); padding:1px 5px; border-radius:4px; }
+
+  .foot { margin-top:30px; padding-top:16px; border-top:1px solid var(--line); font-size:12px; color:var(--ink-faint); }
+  .foot p { margin:0 0 6px; }
+
+  @media (max-width:720px) {
+    .mast { flex-direction:column; }
+    .row { grid-template-columns:1fr; gap:3px; }
+    .readout { position:static; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="mast">
+    <div>
+      <h1>Hotkey HQ</h1>
+      <p>Every shortcut that competes for a keypress on this machine — Claude Code, VS Code, Windows, the terminal, and your own bindings — on one keyboard. Press any combo to see who claims it.</p>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+      <button class="btn capture-on" id="captureBtn" type="button" aria-pressed="true">● Capture: on</button>
+      <button class="btn" id="freeBtn" type="button">Find a free combo</button>
+      <button class="btn" id="addBtn" type="button">+ Add binding</button>
+      <button class="btn" id="themeBtn" type="button">Theme</button>
+    </div>
+  </div>
+
+  <div class="readout" id="readout" data-tone="none" aria-live="polite">
+    <p class="ro-hint"><strong>Capture is on:</strong> shortcuts you press here are swallowed by this window and explained instead of run. Click the page first, then try <kbd>Ctrl+Shift+S</kbd>, <kbd>Ctrl+X</kbd>, <kbd>Alt+P</kbd>. Turn capture off if you need Ctrl+C to actually copy.</p>
+  </div>
+
+  <div class="filters" id="filters">
+    <span class="flabel">Layers</span>
+  </div>
+
+  <div class="filters" style="margin-top:-4px;">
+    <span class="flabel">Board</span>
+    <select id="layoutSel"></select>
+    <button class="fchip" id="fnChip" type="button" aria-pressed="true">
+      <span class="dot" style="background:var(--ink-faint)"></span>Has an Fn key
+    </button>
+    <span class="tbl-count" id="layoutNote"></span>
+  </div>
+
+  <div class="kb-scroll">
+    <div class="kb-tray">
+      <div class="kb" id="kb"></div>
+    </div>
+  </div>
+  <div class="probe" id="probe">
+    <span class="probe-label">raw key probe</span>
+    <span class="probe-body" id="probeBody">press anything — this shows exactly what your keyboard sends, before any interpretation</span>
+  </div>
+  <p class="kb-note">
+    Each coloured dot is one layer that binds that key; the number is how many shortcuts use it.
+    <strong>Hold Ctrl, Alt or Shift</strong> and the keyboard lights up every key that combination unlocks, coloured by whichever layer wins.
+    <strong>Click any key</strong> for the full list. Only enabled layers are counted.
+    Keys marked <span style="font-family:var(--mono);font-size:10px;border:1px solid var(--line);border-radius:3px;padding:0 3px;">fn</span>
+    share their position with a hardware control on a laptop — depending on your BIOS "action keys" setting,
+    plain <kbd>F5</kbd> may send brightness or volume and you'd need <kbd>Fn+F5</kbd> for the real F5.
+    Fn itself is handled in the keyboard firmware and never reaches Windows, so nothing here can see or rebind it.
+  </p>
+
+  <h2>All shortcuts</h2>
+  <div class="tbl-head">
+    <input type="text" id="search" placeholder="Search — try &quot;palette&quot;, &quot;ctrl+shift&quot;, &quot;background&quot;, &quot;undo&quot;">
+    <span class="tbl-count" id="tblCount"></span>
+  </div>
+  <div class="rows" id="tbl"></div>
+
+  <div class="callout" id="ptClash" style="display:none; border-left-color:var(--L-powertoys);"></div>
+
+  <div class="callout">
+    <h3>Windows &amp; PowerShell realities</h3>
+    <ul>
+      <li><strong>Capture mode has a hard ceiling.</strong> While it's on, this window swallows every shortcut it can reach and explains it instead of running it — including the browser-level ones like <code>Ctrl+S</code> and <code>Ctrl+P</code>, and page zoom. What it <em>cannot</em> reach is anything Windows claims first: <code>Win+</code> anything, <code>Alt+Tab</code>, <code>Alt+F4</code>, <code>Ctrl+Alt+Del</code>, <code>Ctrl+Shift+Esc</code>. Those never reach any app, so they're listed below but can't be live-tested. Intercepting them would need a system-wide keyboard hook, which is exactly how keyloggers work — not worth it for a reference tool.</li>
+      <li><strong>Ctrl+Shift+Esc is a real collision.</strong> Windows opens Task Manager; Claude's VS Code extension wants it for "Open in New Tab." The OS wins, so the extension binding effectively doesn't fire.</li>
+      <li><strong>"Meta" in Claude's docs means Alt here.</strong> <code>Meta+P/O/T</code> = <code>Alt+P/O/T</code> on Windows.</li>
+      <li><strong>Claude's <code>Cmd+K</code> clear-screen is dead on Windows.</strong> It needs the Super modifier, which Windows terminals don't report. Bind something else — press an unused combo above and assign <code>chat:clearScreen</code>.</li>
+      <li><strong>Shift+Enter for a newline</strong> needs a one-time <code>/terminal-setup</code> in the VS Code terminal. <code>Ctrl+J</code> works everywhere with no setup.</li>
+    </ul>
+  </div>
+
+  <div class="foot">
+    <p><strong>Read from your machine.</strong> Your Claude Code bindings (<code>~/.claude/keybindings.json</code>), your VS Code bindings, your enabled PowerToys hotkeys and your Windows Terminal bindings are all read live from your own config every time this page loads. Assigning writes only to the Claude Code or VS Code file, whichever you pick.</p>
+    <p><strong>Built-in rows.</strong> The Claude Code, VS Code, Windows, text-editing and PowerShell defaults below are a hand-maintained snapshot: <span id="verifiedNote"></span>. They are all user-rebindable, so treat them as "what it usually is," not a guarantee for your config. <span id="versionNote"></span></p>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ============ talking to the local helper ============
+     The server injects a one-time token as it serves this page, and every API
+     call presents it. Without that, any website you happened to have open could
+     POST to this port and rewrite your keybindings behind your back. */
+  function meta(name) {
+    var el = document.querySelector('meta[name="' + name + '"]');
+    var v = el ? el.getAttribute('content') : '';
+    return v.slice(0, 2) === '__' ? '' : v;   // still a placeholder = served from disk
+  }
+  var TOKEN = meta('hkhq-token');
+  var VERSION = meta('hkhq-version');
+  var VERIFIED = meta('hkhq-verified');
+
+  function api(path, options) {
+    var opt = options || {};
+    opt.headers = opt.headers || {};
+    opt.headers['X-HotkeyHQ-Token'] = TOKEN;
+    return fetch(path, opt);
+  }
+
+  /* ============ layers ============ */
+  var LAYERS = {
+    powertoys:{ name:'PowerToys',   rank: -1 },  // global hook — beats everything
+    windows: { name: 'Windows',     rank: 0 },
+    claude:  { name: 'Claude Code', rank: 1 },
+    custom:  { name: 'Yours',       rank: 1 },
+    shell:   { name: 'Terminal',    rank: 2 },
+    vscode:  { name: 'VS Code',     rank: 3 },
+    text:    { name: 'Text edit',   rank: 4 }
+  };
+  var LAYER_ORDER = ['claude','custom','powertoys','vscode','windows','shell','text'];
+
+  /* ============ shortcut data ============
+     combo: space-separated steps for chords. os:true => OS eats it, page can't capture. */
+  var DATA = [
+    // ---- Claude Code (verified: code.claude.com/docs/en/keybindings) ----
+    { c:'escape',        l:'claude', t:'Cancel input / interrupt Claude', n:'chat:cancel' },
+    { c:'ctrl+c',        l:'claude', t:'Interrupt the current operation', n:'app:interrupt' },
+    { c:'ctrl+d',        l:'claude', t:'Exit Claude Code', n:'app:exit — press twice within 800ms' },
+    { c:'ctrl+l',        l:'claude', t:'Redraw screen, keep input', n:'chat:clearInput — twice in 2s runs /clear' },
+    { c:'ctrl+o',        l:'claude', t:'Toggle verbose transcript', n:'app:toggleTranscript — in the VS Code panel it expands/collapses thinking blocks' },
+    { c:'ctrl+t',        l:'claude', t:"Toggle Claude's to-do checklist", n:'app:toggleTodos — not the /tasks view' },
+    { c:'ctrl+r',        l:'claude', t:'Open history search', n:'history:search' },
+    { c:'ctrl+j',        l:'claude', t:'Newline without submitting', n:'chat:newline — works in every terminal' },
+    { c:'ctrl+s',        l:'claude', t:'Stash the current prompt', n:'chat:stash — press on empty input to restore' },
+    { c:'ctrl+g',        l:'claude', t:'Open prompt in external editor', n:'chat:externalEditor' },
+    { c:'ctrl+b',        l:'claude', t:'Background the current task', n:'task:background' },
+    { c:'ctrl+v',        l:'claude', t:'Paste image from clipboard', n:'chat:imagePaste' },
+    { c:'alt+v',         l:'claude', t:'Paste image from clipboard', n:'chat:imagePaste — the Windows/WSL variant' },
+    { c:'alt+p',         l:'claude', t:'Open the model picker', n:'chat:modelPicker (docs call it Meta+P)' },
+    { c:'alt+o',         l:'claude', t:'Toggle fast mode', n:'chat:fastMode' },
+    { c:'alt+t',         l:'claude', t:'Toggle extended thinking', n:'chat:thinkingToggle' },
+    { c:'shift+tab',     l:'claude', t:'Cycle permission mode', n:'chat:cycleMode — manual → plan → auto-accept → bypass' },
+    { c:'tab',           l:'claude', t:'Accept autocomplete suggestion', n:'autocomplete:accept' },
+    { c:'enter',         l:'claude', t:'Submit the message', n:'chat:submit' },
+    { c:'up',            l:'claude', t:'Previous prompt in history', n:'history:previous' },
+    { c:'down',          l:'claude', t:'Next prompt in history', n:'history:next' },
+    { c:'ctrl+shift+-',  l:'claude', t:'Undo last input action', n:'chat:undo (also Ctrl+_)' },
+    { c:'ctrl+x ctrl+k', l:'claude', t:'Stop all background subagents', n:'chat:killAgents' },
+    { c:'ctrl+x ctrl+e', l:'claude', t:'Open prompt in external editor', n:'chat:externalEditor — chord form' },
+    { c:'ctrl+x ctrl+b', l:'claude', t:'Background the current task', n:'task:background — chord form, avoids tmux prefix' },
+    { c:'ctrl+esc',      l:'claude', t:'Toggle focus: editor ↔ Claude', n:'VS Code extension — "Focus Input"' },
+    { c:'alt+k',         l:'claude', t:'Insert @-mention with line range', n:'VS Code extension — needs the editor focused' },
+    { c:'ctrl+shift+t',  l:'claude', t:'Reopen last closed Claude session', n:'VS Code extension — falls through to VS Code reopen-tab otherwise' },
+    { c:'ctrl+shift+esc',l:'claude', t:'Open Claude in a new tab', n:'VS Code extension — but Windows Task Manager takes this first', os:true },
+    { c:'ctrl+n',        l:'claude', t:'New conversation', n:'VS Code extension — off unless enableNewConversationShortcut is true' },
+    { c:'shift+enter',   l:'claude', t:'Newline in the VS Code prompt box', n:'In a terminal this needs /terminal-setup first' },
+
+    // ---- VS Code ----
+    { c:'ctrl+shift+p',  l:'vscode', t:'Command Palette', n:'Run any command by name' },
+    { c:'f1',            l:'vscode', t:'Command Palette', n:'Same as Ctrl+Shift+P' },
+    { c:'ctrl+p',        l:'vscode', t:'Quick Open — go to file', n:'' },
+    { c:'ctrl+shift+e',  l:'vscode', t:'Explorer', n:'' },
+    { c:'ctrl+shift+f',  l:'vscode', t:'Search across files', n:'' },
+    { c:'ctrl+shift+g',  l:'vscode', t:'Source control', n:'' },
+    { c:'ctrl+shift+d',  l:'vscode', t:'Run and debug', n:'' },
+    { c:'ctrl+shift+x',  l:'vscode', t:'Extensions', n:'' },
+    { c:'ctrl+shift+o',  l:'vscode', t:'Go to symbol in file', n:'' },
+    { c:'ctrl+b',        l:'vscode', t:'Toggle the side bar', n:'' },
+    { c:'ctrl+j',        l:'vscode', t:'Toggle the bottom panel', n:'' },
+    { c:'ctrl+`',        l:'vscode', t:'Toggle integrated terminal', n:'' },
+    { c:'ctrl+,',        l:'vscode', t:'Settings', n:'' },
+    { c:'ctrl+/',        l:'vscode', t:'Toggle line comment', n:'' },
+    { c:'ctrl+d',        l:'vscode', t:'Add next match to selection', n:'Multi-cursor' },
+    { c:'ctrl+shift+l',  l:'vscode', t:'Select all occurrences', n:'' },
+    { c:'ctrl+shift+k',  l:'vscode', t:'Delete line', n:'' },
+    { c:'ctrl+g',        l:'vscode', t:'Go to line', n:'' },
+    { c:'ctrl+t',        l:'vscode', t:'Go to symbol in workspace', n:'' },
+    { c:'ctrl+w',        l:'vscode', t:'Close editor', n:'This page can\'t capture it — the window closes', os:true },
+    { c:'ctrl+\\',       l:'vscode', t:'Split editor', n:'' },
+    { c:'f2',            l:'vscode', t:'Rename symbol', n:'' },
+    { c:'f5',            l:'vscode', t:'Start debugging', n:'' },
+    { c:'f9',            l:'vscode', t:'Toggle breakpoint', n:'' },
+    { c:'f12',           l:'vscode', t:'Go to definition', n:'' },
+    { c:'alt+up',        l:'vscode', t:'Move line up', n:'' },
+    { c:'alt+down',      l:'vscode', t:'Move line down', n:'' },
+    { c:'shift+alt+f',   l:'vscode', t:'Format document', n:'' },
+    { c:'ctrl+k ctrl+s', l:'vscode', t:'Keyboard Shortcuts editor', n:'' },
+    { c:'ctrl+space',    l:'vscode', t:'Trigger suggestions', n:'' },
+
+    // ---- Windows (OS-level, uncapturable) ----
+    { c:'win+d',         l:'windows', t:'Show desktop', n:'', os:true },
+    { c:'win+e',         l:'windows', t:'File Explorer', n:'', os:true },
+    { c:'win+l',         l:'windows', t:'Lock the PC', n:'', os:true },
+    { c:'win+r',         l:'windows', t:'Run dialog', n:'', os:true },
+    { c:'win+i',         l:'windows', t:'Settings', n:'', os:true },
+    { c:'win+v',         l:'windows', t:'Clipboard history', n:'', os:true },
+    { c:'win+.',         l:'windows', t:'Emoji picker', n:'', os:true },
+    { c:'win+x',         l:'windows', t:'Power user menu', n:'', os:true },
+    { c:'win+tab',       l:'windows', t:'Task view', n:'', os:true },
+    { c:'win+shift+s',   l:'windows', t:'Snip a screenshot', n:'', os:true },
+    { c:'win+left',      l:'windows', t:'Snap window left', n:'', os:true },
+    { c:'win+right',     l:'windows', t:'Snap window right', n:'', os:true },
+    { c:'alt+tab',       l:'windows', t:'Switch apps', n:'', os:true },
+    { c:'alt+f4',        l:'windows', t:'Close the window', n:'', os:true },
+    { c:'ctrl+shift+esc',l:'windows', t:'Task Manager', n:'Beats the Claude extension binding on the same keys', os:true },
+
+    // ---- universal text editing ----
+    { c:'ctrl+c',        l:'text', t:'Copy', n:'' },
+    { c:'ctrl+x',        l:'text', t:'Cut', n:'' },
+    { c:'ctrl+v',        l:'text', t:'Paste', n:'' },
+    { c:'ctrl+z',        l:'text', t:'Undo', n:'' },
+    { c:'ctrl+y',        l:'text', t:'Redo', n:'' },
+    { c:'ctrl+shift+z',  l:'text', t:'Redo', n:'Alternative to Ctrl+Y' },
+    { c:'ctrl+a',        l:'text', t:'Select all', n:'' },
+    { c:'ctrl+s',        l:'text', t:'Save', n:'' },
+    { c:'ctrl+f',        l:'text', t:'Find', n:'' },
+    { c:'ctrl+h',        l:'text', t:'Replace', n:'' },
+    { c:'ctrl+n',        l:'text', t:'New', n:'' },
+    { c:'ctrl+o',        l:'text', t:'Open', n:'' },
+    { c:'ctrl+p',        l:'text', t:'Print', n:'In VS Code this is Quick Open instead' },
+    { c:'ctrl+left',     l:'text', t:'Jump one word left', n:'' },
+    { c:'ctrl+right',    l:'text', t:'Jump one word right', n:'' },
+    { c:'ctrl+backspace',l:'text', t:'Delete previous word', n:'' },
+    { c:'home',          l:'text', t:'Start of line', n:'' },
+    { c:'end',           l:'text', t:'End of line', n:'' },
+
+    // ---- terminal / PowerShell (PSReadLine, Windows mode) ----
+    { c:'ctrl+c',        l:'shell', t:'Interrupt the running command', n:'' },
+    { c:'ctrl+l',        l:'shell', t:'Clear the screen', n:'' },
+    { c:'ctrl+r',        l:'shell', t:'Reverse-search history', n:'PSReadLine' },
+    { c:'tab',           l:'shell', t:'Complete the current token', n:'' },
+    { c:'up',            l:'shell', t:'Previous command', n:'' },
+    { c:'down',          l:'shell', t:'Next command', n:'' },
+    { c:'ctrl+space',    l:'shell', t:'Menu completion', n:'PSReadLine' },
+    { c:'ctrl+u',        l:'shell', t:'Delete to start of line', n:'' },
+    { c:'ctrl+k',        l:'shell', t:'Delete to end of line', n:'' },
+    { c:'ctrl+w',        l:'shell', t:'Delete previous word', n:'', os:true },
+
+    // ---- commonly-hit combos that used to report as "free" ----
+    { c:'ctrl+shift+s',  l:'text',   t:'Save As', n:'The usual binding across Windows apps' },
+    { c:'ctrl+shift+s',  l:'vscode', t:'Save All', n:'VS Code uses this instead of Save As' },
+    { c:'ctrl+shift+n',  l:'windows',t:'New window', n:'In File Explorer, new folder', os:true },
+    { c:'ctrl+shift+w',  l:'vscode', t:'Close window', n:'', os:true },
+    { c:'ctrl+shift+v',  l:'text',   t:'Paste without formatting', n:'' },
+    { c:'ctrl+shift+v',  l:'vscode', t:'Open Markdown preview', n:'' },
+    { c:'ctrl+shift+i',  l:'vscode', t:'Developer tools', n:'' },
+    { c:'ctrl+shift+m',  l:'vscode', t:'Problems panel', n:'' },
+    { c:'ctrl+shift+u',  l:'vscode', t:'Output panel', n:'' },
+    { c:'ctrl+shift+y',  l:'vscode', t:'Debug console', n:'' },
+    { c:'ctrl+shift+b',  l:'vscode', t:'Run build task', n:'' },
+    { c:'ctrl+shift+h',  l:'vscode', t:'Replace across files', n:'' },
+    { c:'ctrl+shift+tab',l:'vscode', t:'Previous editor tab', n:'' },
+    { c:'ctrl+tab',      l:'vscode', t:'Next editor tab', n:'' },
+    { c:'ctrl+e',        l:'vscode', t:'Quick open recent', n:'' },
+    { c:'ctrl+e',        l:'claude', t:'Toggle transcript detail / explain a command', n:'transcript:toggleShowAll, and confirm:toggleExplanation in permission prompts' },
+    { c:'ctrl+k ctrl+c', l:'vscode', t:'Add line comment', n:'' },
+    { c:'ctrl+k ctrl+u', l:'vscode', t:'Remove line comment', n:'' },
+    { c:'ctrl+k ctrl+0', l:'vscode', t:'Fold all', n:'' },
+    { c:'ctrl+k ctrl+j', l:'vscode', t:'Unfold all', n:'' },
+    { c:'ctrl+home',     l:'text',   t:'Jump to start of document', n:'' },
+    { c:'ctrl+end',      l:'text',   t:'Jump to end of document', n:'' },
+    { c:'shift+home',    l:'text',   t:'Select to start of line', n:'' },
+    { c:'shift+end',     l:'text',   t:'Select to end of line', n:'' },
+    { c:'alt+left',      l:'text',   t:'Navigate back', n:'' },
+    { c:'alt+right',     l:'text',   t:'Navigate forward', n:'' },
+    { c:'f3',            l:'text',   t:'Find next', n:'' },
+    { c:'shift+f3',      l:'text',   t:'Find previous', n:'' },
+    { c:'f11',           l:'text',   t:'Toggle fullscreen', n:'' },
+    { c:'ctrl+=',        l:'text',   t:'Zoom in', n:'This window swallows it while capture is on' },
+    { c:'ctrl+-',        l:'text',   t:'Zoom out', n:'This window swallows it while capture is on' },
+    { c:'ctrl+0',        l:'text',   t:'Reset zoom', n:'This window swallows it while capture is on' }
+  ];
+
+  var CUSTOM = [];   // loaded from keybindings.json
+
+  var CONTEXTS = ['Global','Chat','Task','Autocomplete','Confirmation','Help','Transcript','HistorySearch',
+    'ThemePicker','Settings','Tabs','Attachments','Footer','MessageSelector','DiffDialog','ModelPicker','Select','Plugin','Scroll'];
+
+  var ACTIONS = {
+    app:['interrupt','exit','redraw','toggleTodos','toggleTranscript','openArtifact','toggleBrief','diffFileListUp','diffFileListDown'],
+    history:['search','previous','next'],
+    chat:['cancel','clearInput','clearScreen','killAgents','cycleMode','modelPicker','fastMode','thinkingToggle','workflowKeywordToggle','submit','newline','undo','externalEditor','stash','imagePaste'],
+    autocomplete:['accept','dismiss','previous','next'],
+    confirm:['yes','no','previous','next','nextField','previousField','toggle','cycleMode','toggleExplanation'],
+    tabs:['next','previous'],
+    transcript:['toggleShowAll','exit'],
+    historySearch:['next','accept','cancel','execute','cycleScope'],
+    task:['background'],
+    theme:['toggleSyntaxHighlighting','editCustom'],
+    help:['dismiss'],
+    attachments:['next','previous','remove','exit'],
+    footer:['next','previous','up','down','openSelected','clearSelection','close','dismiss'],
+    messageSelector:['up','down','top','bottom','select'],
+    diff:['dismiss','previousSource','nextSource','back','viewDetails','previousFile','nextFile'],
+    modelPicker:['decreaseEffort','increaseEffort','thisSessionOnly'],
+    select:['next','previous','accept','cancel','pageUp','pageDown','first','last'],
+    plugin:['toggle','install','favorite'],
+    permission:['toggleDebug'],
+    settings:['search','retry','periodDay','periodWeek','sortByTokens'],
+    voice:['pushToTalk'],
+    scroll:['lineUp','lineDown','pageUp','pageDown','top','bottom','halfPageUp','halfPageDown','fullPageUp','fullPageDown'],
+    selection:['copy','clear','extendLeft','extendRight','extendUp','extendDown','extendLineStart','extendLineEnd']
+  };
+
+  var VSCODE_COMMANDS = {
+    'Files & windows': [
+      ['workbench.action.files.save','Save'],
+      ['workbench.action.files.saveAll','Save all'],
+      ['workbench.action.closeActiveEditor','Close editor'],
+      ['workbench.action.splitEditor','Split editor'],
+      ['workbench.action.nextEditor','Next editor'],
+      ['workbench.action.previousEditor','Previous editor'],
+      ['workbench.action.reloadWindow','Reload window'],
+      ['workbench.action.togglefullscreen','Toggle fullscreen']
+    ],
+    'Navigate': [
+      ['workbench.action.showCommands','Command Palette'],
+      ['workbench.action.quickOpen','Go to file'],
+      ['workbench.action.gotoLine','Go to line'],
+      ['editor.action.revealDefinition','Go to definition'],
+      ['editor.action.goToReferences','Go to references'],
+      ['workbench.action.findInFiles','Find in files'],
+      ['workbench.action.replaceInFiles','Replace in files']
+    ],
+    'Edit': [
+      ['editor.action.commentLine','Toggle line comment'],
+      ['editor.action.formatDocument','Format document'],
+      ['editor.action.rename','Rename symbol'],
+      ['editor.action.deleteLines','Delete line'],
+      ['editor.action.moveLinesUpAction','Move line up'],
+      ['editor.action.moveLinesDownAction','Move line down'],
+      ['editor.action.copyLinesDownAction','Copy line down'],
+      ['editor.action.addSelectionToNextFindMatch','Add next match to selection'],
+      ['editor.action.selectHighlights','Select all occurrences']
+    ],
+    'Panels': [
+      ['workbench.action.toggleSidebarVisibility','Toggle side bar'],
+      ['workbench.action.togglePanel','Toggle panel'],
+      ['workbench.action.terminal.toggleTerminal','Toggle terminal'],
+      ['workbench.action.terminal.new','New terminal'],
+      ['workbench.view.explorer','Explorer'],
+      ['workbench.view.search','Search'],
+      ['workbench.view.scm','Source control'],
+      ['workbench.view.debug','Run and debug'],
+      ['workbench.view.extensions','Extensions'],
+      ['workbench.action.toggleZenMode','Zen mode']
+    ],
+    'Run': [
+      ['workbench.action.tasks.build','Run build task'],
+      ['workbench.action.debug.start','Start debugging'],
+      ['editor.debug.action.toggleBreakpoint','Toggle breakpoint']
+    ]
+  };
+
+  var VSCODE_WHEN = ['', 'editorTextFocus', 'editorFocus', 'terminalFocus', '!terminalFocus',
+                     'explorerViewletVisible', 'inDebugMode', 'editorHasSelection'];
+
+  /* ============ keyboard layouts ============
+     A key is [id, cap, width, isMod]. id '@x' = a modifier key (not bindable),
+     '_' = a spacer of the given width. Alphas/numbers are shared between layouts. */
+  function letters(str) { return str.split('').map(function (c) { return [c, c.toUpperCase(), 1]; }); }
+
+  var R_NUM   = [['`','`',1]].concat(letters('1234567890'), [['-','-',1],['=','=',1]]);
+  var R_TOP   = letters('qwertyuiop').concat([['[','[',1],[']',']',1]]);
+  var R_HOME  = letters('asdfghjkl').concat([[';',';',1],["'","'",1]]);
+  var R_BOT   = letters('zxcvbnm').concat([[',',',',1],['.','.',1],['/','/',1]]);
+  var FKEYS   = [1,2,3,4,5,6,7,8,9,10,11,12].map(function (n) { return ['f'+n,'F'+n,1]; });
+
+  // F-row with the desktop 4-4-4 grouping.
+  function fRowGrouped() {
+    var r = [['escape','Esc',1,1], ['_','',1]];
+    FKEYS.forEach(function (k, i) {
+      if (i > 0 && i % 4 === 0) r.push(['_','',0.5]);
+      r.push(k);
+    });
+    return r;
+  }
+  // F-row on a laptop: no grouping gaps, keys stretched to span the board.
+  function fRowFlat(w) {
+    return FKEYS.map(function (k) { return [k[0], k[1], w]; });
+  }
+
+  var NAV3 = function (a, b, c) { return [['_','',0.25], a, b, c]; };
+
+  var LAYOUTS = {
+    // 19.25u wide
+    'laptop-numpad': {
+      name: 'Laptop with numpad', fn: true,
+      note: 'Full-size laptop board: stretched F-row, inverted-T arrows, numeric keypad.',
+      rows: [
+        [['escape','Esc',1.25,1]].concat(fRowFlat(1.375), [['delete','del',1.5,1]]),
+        R_NUM.concat([['backspace','backspace',2,1]], [['_','',0.25],['numlock','num',1,1],['numdiv','/',1],['nummul','*',1],['numsub','-',1]]),
+        [['tab','tab',1.5,1]].concat(R_TOP, [['\\','\\',1.5]], [['_','',0.25],['num7','7',1],['num8','8',1],['num9','9',1],['numadd','+',1]]),
+        [['capslock','caps',1.75,1]].concat(R_HOME, [['enter','enter',2.25,1]], [['_','',0.25],['num4','4',1],['num5','5',1],['num6','6',1],['_','',1]]),
+        [['@shift','shift',2.25,1]].concat(R_BOT, [['@shift','shift',1.75,1],['up','up',1]], [['_','',0.25],['num1','1',1],['num2','2',1],['num3','3',1],['numenter','ent',1]]),
+        [['@ctrl','ctrl',1.25,1],['@fn','fn',1.25,1],['@win','win',1.25,1],['@alt','alt',1.25,1],['space','space',5.25,1],['@alt','alt',1.25,1],['@ctrl','ctrl',1.25,1],
+         ['left','left',1],['down','down',1],['right','right',1],
+         ['_','',0.5],['num0','0',2],['numdot','.',1]]
+      ]
+    },
+    // 15.5u wide
+    'laptop': {
+      name: 'Laptop, no numpad', fn: true,
+      note: 'Compact laptop board: F-row present, arrows tucked into the bottom row, no keypad.',
+      rows: [
+        [['escape','Esc',1.25,1]].concat(FKEYS, [['delete','del',2.25,1]]),
+        R_NUM.concat([['backspace','backspace',2.5,1]]),
+        [['tab','tab',1.5,1]].concat(R_TOP, [['\\','\\',2]]),
+        [['capslock','caps',1.75,1]].concat(R_HOME, [['enter','enter',2.75,1]]),
+        [['@shift','shift',2.25,1]].concat(R_BOT, [['@shift','shift',2.25,1],['up','up',1]]),
+        [['@ctrl','ctrl',1.25,1],['@fn','fn',1.25,1],['@win','win',1.25,1],['@alt','alt',1.25,1],['space','space',5,1],['@alt','alt',1.25,1],['@ctrl','ctrl',1.25,1],['left','left',1],['down','down',1],['right','right',1]]
+      ]
+    },
+    // 18.25u wide
+    'tkl': {
+      name: 'Tenkeyless (87)', fn: false,
+      note: 'Desktop board: grouped F-row and a full nav cluster, no keypad.',
+      rows: [
+        fRowGrouped().concat([['_','',0.25],['printscreen','prtsc',1,1],['scrolllock','slk',1,1],['pause','brk',1,1]]),
+        R_NUM.concat([['backspace','backspace',2,1]], NAV3(['insert','ins',1,1],['home','Home',1],['pageup','pgup',1,1])),
+        [['tab','tab',1.5,1]].concat(R_TOP, [['\\','\\',1.5]], NAV3(['delete','del',1,1],['end','End',1],['pagedown','pgdn',1,1])),
+        [['capslock','caps',1.75,1]].concat(R_HOME, [['enter','enter',2.25,1]], [['_','',3.25]]),
+        [['@shift','shift',2.25,1]].concat(R_BOT, [['@shift','shift',2.75,1]], [['_','',1.25],['up','up',1],['_','',1]]),
+        [['@ctrl','ctrl',1.25,1],['@win','win',1.25,1],['@alt','alt',1.25,1],['space','space',6.25,1],['@alt','alt',1.25,1],['@win','win',1.25,1],['@menu','menu',1.25,1],['@ctrl','ctrl',1.25,1],
+         ['_','',0.25],['left','left',1],['down','down',1],['right','right',1]]
+      ]
+    },
+    // 16u wide
+    '65': {
+      name: '65% compact', fn: true,
+      note: 'No F-row at all — F1–F12 sit on a hidden Fn layer, so this board cannot show them.',
+      rows: [
+        R_NUM.concat([['backspace','backspace',2,1],['delete','del',1,1]]),
+        [['tab','tab',1.5,1]].concat(R_TOP, [['\\','\\',1.5],['home','Home',1]]),
+        [['capslock','caps',1.75,1]].concat(R_HOME, [['enter','enter',2.25,1],['pageup','pgup',1,1]]),
+        [['@shift','shift',2.25,1]].concat(R_BOT, [['@shift','shift',1.75,1],['up','up',1],['pagedown','pgdn',1,1]]),
+        [['@ctrl','ctrl',1.25,1],['@win','win',1.25,1],['@alt','alt',1.25,1],['space','space',6.25,1],['@alt','alt',1,1],['@fn','fn',1,1],['@ctrl','ctrl',1,1],['left','left',1],['down','down',1],['right','right',1]]
+      ]
+    }
+  };
+
+  // Fn+F-key hardware functions vary by manufacturer and model, so this app
+  // shows the generic set rather than inventing per-model labels.
+  var FN_NOTE = 'Fn combinations are handled by the keyboard firmware itself. They never reach Windows, ' +
+                'so no application — including this one — can see or rebind them.';
+
+  var layoutId = store('hotkeyhq-layout') || 'laptop-numpad';
+  var hasFn = store('hotkeyhq-fn');
+  hasFn = hasFn === null || hasFn === undefined ? true : hasFn === '1';
+  function ROWS() { return (LAYOUTS[layoutId] || LAYOUTS['laptop-numpad']).rows; }
+
+  /* ============ key normalisation ============ */
+  var CODE = {};
+  'abcdefghijklmnopqrstuvwxyz'.split('').forEach(function(c){ CODE['Key'+c.toUpperCase()] = c; });
+  '0123456789'.split('').forEach(function(d){ CODE['Digit'+d] = d; });
+  for (var i=1;i<=12;i++) CODE['F'+i] = 'f'+i;
+  Object.assign(CODE, {
+    Minus:'-', Equal:'=', BracketLeft:'[', BracketRight:']', Backslash:'\\', Semicolon:';', Quote:"'",
+    Comma:',', Period:'.', Slash:'/', Backquote:'`', Escape:'escape', Tab:'tab', Enter:'enter',
+    Backspace:'backspace', Space:'space', Delete:'delete', Home:'home', End:'end',
+    ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right', CapsLock:'capslock'
+  });
+  var MODCODE = { ControlLeft:'ctrl',ControlRight:'ctrl',AltLeft:'alt',AltRight:'alt',
+                  ShiftLeft:'shift',ShiftRight:'shift',MetaLeft:'win',MetaRight:'win' };
+  var CAPS = { escape:'Esc', tab:'Tab', enter:'Enter', backspace:'Backspace', space:'Space', delete:'Del',
+               home:'Home', end:'End', up:'↑', down:'↓', left:'←', right:'→', capslock:'CapsLock' };
+  var MODORDER = ['ctrl','alt','shift','win'];
+
+  function normalise(step) {
+    var parts = step.toLowerCase().split('+');
+    var base = parts.pop();
+    var mods = MODORDER.filter(function(m){ return parts.indexOf(m) >= 0; });
+    return mods.concat(base).join('+');
+  }
+  function baseOf(step){ var p = step.split('+'); return p[p.length-1]; }
+  function pretty(step) {
+    var parts = step.split('+'); var base = parts.pop();
+    var mods = parts.map(function(m){ return m==='ctrl'?'Ctrl':m==='alt'?'Alt':m==='shift'?'Shift':m==='win'?'Win':m; });
+    var b = CAPS[base] || (base.length===1 ? base.toUpperCase() : base.charAt(0).toUpperCase()+base.slice(1));
+    return mods.concat(b).join('+');
+  }
+  function prettyCombo(combo){ return combo.split(' ').map(pretty).join(' then '); }
+
+  /* ============ index ============ */
+  var INDEX = {};
+  var KEYMAP = {};   // base key -> [{step, combo, e}] for the enabled layers
+
+  /* A VS Code "-command" entry switches a built-in default off. Those combos are
+     collected here so the hardcoded default stops claiming a key the user has
+     actually disabled. */
+  var SUPPRESSED = {};
+  function allEntries() {
+    return DATA.filter(function (e) {
+      return !(e.l === 'vscode' && SUPPRESSED[e.c.split(' ').map(normalise).join(' ')]);
+    }).concat(CUSTOM);
+  }
+
+  function indexAll() {
+    INDEX = {};
+    allEntries().forEach(function (e) {
+      var key = e.c.split(' ').map(normalise).join(' ');
+      (INDEX[key] = INDEX[key] || []).push(e);
+    });
+    Object.keys(INDEX).forEach(function (k) {
+      INDEX[k].sort(function (a,b) { return LAYERS[a.l].rank - LAYERS[b.l].rank; });
+    });
+  }
+  function lookup(combo){ return INDEX[combo] || []; }
+  function chordPrefixes(step) {
+    var out = [];
+    Object.keys(INDEX).forEach(function (k) {
+      var parts = k.split(' ');
+      if (parts.length > 1 && parts[0] === step) out.push(k);
+    });
+    return out;
+  }
+
+  /* ============ state ============ */
+  var active = {};
+  LAYER_ORDER.forEach(function(l){ active[l] = true; });
+
+  /* ============ build filters ============ */
+  var filtersEl = document.getElementById('filters');
+  function buildFilters() {
+    LAYER_ORDER.forEach(function (l) {
+      var n = allEntries().filter(function(e){ return e.l === l; }).length;
+      var b = document.createElement('button');
+      b.className = 'fchip'; b.type = 'button';
+      b.setAttribute('aria-pressed', active[l] ? 'true' : 'false');
+      b.setAttribute('data-layer', l);
+      b.innerHTML = '<span class="dot" style="background:var(--L-'+l+')"></span>' +
+                    LAYERS[l].name + ' <span class="cnt">'+n+'</span>';
+      b.addEventListener('click', function () {
+        active[l] = !active[l];
+        b.setAttribute('aria-pressed', active[l] ? 'true':'false');
+        paintKeyboard(); renderTable();
+      });
+      filtersEl.appendChild(b);
+    });
+  }
+  function refreshFilterCounts() {
+    LAYER_ORDER.forEach(function (l) {
+      var n = allEntries().filter(function(e){ return e.l === l; }).length;
+      var chip = filtersEl.querySelector('[data-layer="'+l+'"] .cnt');
+      if (chip) chip.textContent = n;
+    });
+  }
+
+  /* ============ build keyboard ============ */
+  var kbEl = document.getElementById('kb');
+  var SIDE_CODE = { ctrl:'Control', alt:'Alt', shift:'Shift', win:'Meta' };
+  var modSeen = {};
+
+  function buildKeyboard() {
+    var rows = ROWS();
+    modSeen = {};
+    kbEl.innerHTML = '';
+    // widest row decides the board width, so layouts of any size stay aligned
+    var widest = 0;
+    rows.forEach(function (row) {
+      var w = row.reduce(function (n, s) { return n + (s[2] || 1); }, 0);
+      if (w > widest) widest = w;
+    });
+    kbEl.style.setProperty('--cols', widest);
+
+    rows.forEach(function (row) {
+      var r = document.createElement('div');
+      r.className = 'krow';
+      row.forEach(function (spec) {
+        var id = spec[0], cap = spec[1], w = spec[2] || 1, isMod = spec[3];
+
+        if (id === '_') {                       // spacer between clusters
+          var sp = document.createElement('div');
+          sp.className = 'kspace'; sp.style.setProperty('--w', w);
+          r.appendChild(sp); return;
+        }
+        // No Fn key on this board: leave a gap rather than shifting the row out of true.
+        if (id === '@fn' && !hasFn) {
+          var g = document.createElement('div');
+          g.className = 'kspace'; g.style.setProperty('--w', w);
+          r.appendChild(g); return;
+        }
+
+        var k = document.createElement('div');
+        k.className = 'key' + (isMod ? ' mod':'') + (String(cap).length > 4 ? ' wide':'');
+        k.style.setProperty('--w', w);
+        if (id.charAt(0) === '@') {
+          var mod = id.slice(1);
+          k.setAttribute('data-mod', mod);
+          // Give each physical modifier its own identity so we can light the
+          // exact key pressed instead of both sides at once.
+          if (SIDE_CODE[mod]) {
+            modSeen[mod] = (modSeen[mod] || 0) + 1;
+            k.setAttribute('data-code', SIDE_CODE[mod] + (modSeen[mod] === 1 ? 'Left' : 'Right'));
+          }
+          if (id === '@fn') { k.classList.add('fnkey'); k.title = FN_NOTE; }
+        } else {
+          k.setAttribute('data-key', id);
+        }
+        var t = document.createElement('div'); t.className = 'ktags';
+        var c = document.createElement('span'); c.className = 'cap'; c.textContent = cap;
+        k.appendChild(t); k.appendChild(c);
+        // On a laptop the F-row is shared with hardware controls.
+        if (hasFn && /^f([1-9]|1[0-2])$/.test(id)) {
+          k.classList.add('fnshared');
+          var badge = document.createElement('span');
+          badge.className = 'fnbadge'; badge.textContent = 'fn';
+          k.appendChild(badge);
+        }
+        r.appendChild(k);
+      });
+      kbEl.appendChild(r);
+    });
+    paintKeyboard();
+  }
+
+  function paintKeyboard() {
+    kbEl.querySelectorAll('.ktags').forEach(function(t){ t.innerHTML = ''; });
+    var byKey = {};
+    Object.keys(INDEX).forEach(function (combo) {
+      INDEX[combo].forEach(function (e) {
+        if (!active[e.l]) return;
+        combo.split(' ').forEach(function (step, idx) {
+          var b = baseOf(step);
+          (byKey[b] = byKey[b] || []).push({ step:step, combo:combo, e:e, chordIdx: combo.split(' ').length>1 ? idx : -1 });
+        });
+      });
+    });
+    KEYMAP = byKey;
+    Object.keys(byKey).forEach(function (b) {
+      var el = kbEl.querySelector('.key[data-key="'+CSS.escape(b)+'"]');
+      if (!el) return;
+      var host = el.querySelector('.ktags');
+      var items = byKey[b];
+
+      // one dot per distinct layer, ordered by who wins
+      var layers = [];
+      items.forEach(function (it) { if (layers.indexOf(it.e.l) < 0) layers.push(it.e.l); });
+      layers.sort(function(a,z){ return LAYERS[a].rank - LAYERS[z].rank; });
+      layers.slice(0,5).forEach(function (l) {
+        var dot = document.createElement('span');
+        dot.className = 'kdot'; dot.setAttribute('data-l', l);
+        host.appendChild(dot);
+      });
+
+      // distinct combos, not raw steps — that's what "how many shortcuts" means
+      var combos = {};
+      items.forEach(function (it) { combos[it.combo] = 1; });
+      var total = Object.keys(combos).length;
+      if (total > 1) {
+        var c = document.createElement('span');
+        c.className = 'kcount'; c.textContent = total;
+        host.appendChild(c);
+      }
+      el.title = Object.keys(combos).sort().map(function (combo) {
+        return prettyCombo(combo) + ' — ' + INDEX[combo].map(function(e){ return LAYERS[e.l].name + ': ' + e.t; }).join(' / ');
+      }).join('\n') + '\n\nClick for the full list.';
+    });
+  }
+
+  /* ---- hold a modifier to preview every key it unlocks ---- */
+  var heldMods = [];
+  function modsFromEvent(e) {
+    var m = [];
+    if (e.ctrlKey) m.push('ctrl');
+    if (e.altKey) m.push('alt');
+    if (e.shiftKey) m.push('shift');
+    if (e.metaKey) m.push('win');
+    return m;
+  }
+  function clearPeek() {
+    kbEl.querySelectorAll('.key').forEach(function (k) {
+      k.classList.remove('lit','dim'); k.style.removeProperty('--lit');
+    });
+  }
+  function peek(mods) {
+    clearPeek();
+    if (!mods.length) return;
+    var prefix = mods.join('+') + '+';
+    var lit = 0;
+    kbEl.querySelectorAll('.key[data-key]').forEach(function (el) {
+      var base = el.getAttribute('data-key');
+      var items = (KEYMAP[base] || []).filter(function (it) {
+        // only the step that literally starts with these modifiers
+        return it.step === prefix + base;
+      });
+      if (!items.length) { el.classList.add('dim'); return; }
+      items.sort(function(a,z){ return LAYERS[a.e.l].rank - LAYERS[z.e.l].rank; });
+      el.style.setProperty('--lit', 'var(--L-' + items[0].e.l + ')');
+      el.classList.add('lit');
+      lit++;
+    });
+    // Modifier caps have no data-key, so without this they stayed at full
+    // brightness while everything else dimmed — which read as "this key is
+    // pressed" even when it wasn't. Only the physically-held ones stay bright.
+    kbEl.querySelectorAll('.key[data-mod]').forEach(function (el) {
+      var code = el.getAttribute('data-code');
+      if (!(code && heldCodes[code])) el.classList.add('dim');
+    });
+    if (lit === 0) clearPeek();
+  }
+
+  var flashT = null;
+  function clearFlash(){ kbEl.querySelectorAll('.key').forEach(function(k){ k.classList.remove('hit','miss'); }); }
+  function flash(combo, kind) {
+    clearTimeout(flashT); clearFlash();
+    combo.split(' ').forEach(function (step) {
+      var el = kbEl.querySelector('.key[data-key="'+CSS.escape(baseOf(step))+'"]');
+      if (el) el.classList.add(kind);
+    });
+    flashT = setTimeout(clearFlash, 1500);
+  }
+
+  /* ---- raw probe: report every keydown verbatim, before any filtering ----
+     This is the diagnostic for "my F-keys do nothing": if a key never appears
+     here, the keyboard firmware or Windows consumed it and no app can see it. */
+  var probeBody = document.getElementById('probeBody');
+  var PHYS_NAME = {
+    ControlLeft:'Left Ctrl', ControlRight:'Right Ctrl',
+    AltLeft:'Left Alt', AltRight:'Right Alt',
+    ShiftLeft:'Left Shift', ShiftRight:'Right Shift',
+    MetaLeft:'Left Win', MetaRight:'Right Win'
+  };
+  function physName(code) {
+    if (PHYS_NAME[code]) return PHYS_NAME[code];
+    var b = CODE[code];
+    if (!b) return code || 'unknown key';
+    return CAPS[b] || (b.length === 1 ? b.toUpperCase() : b.toUpperCase());
+  }
+
+  document.addEventListener('keydown', function (e) {
+    function flag(name, on) { return '<span class="' + (on ? 'on' : 'off') + '">' + name + '</span>'; }
+    var notes = '';
+    if (!CODE[e.code] && !MODCODE[e.code]) {
+      notes += ' <span class="probe-warn">— no name for this code, so it is ignored</span>';
+    }
+    if (e.code === 'AltRight' && e.ctrlKey) {
+      notes += ' <span class="probe-warn">— AltGr: Windows fakes a Ctrl alongside it; ignored here</span>';
+    }
+    if (e.repeat) notes += ' <span class="off">(held)</span>';
+
+    // Report what's physically down, not what the modifier flags claim.
+    var down = Object.keys(heldCodes).map(physName);
+    probeBody.innerHTML =
+      'you pressed <b>' + esc(physName(e.code)) + '</b>' +
+      ' &nbsp;·&nbsp; code=<b>' + esc(e.code || '?') + '</b>' +
+      ' &nbsp;·&nbsp; ' +
+      flag('ctrl', heldCodes['ControlLeft'] || heldCodes['ControlRight']) + ' ' +
+      flag('alt', heldCodes['AltLeft'] || heldCodes['AltRight']) + ' ' +
+      flag('shift', heldCodes['ShiftLeft'] || heldCodes['ShiftRight']) + ' ' +
+      flag('win', heldCodes['MetaLeft'] || heldCodes['MetaRight']) +
+      (down.length ? ' &nbsp;·&nbsp; holding: <b>' + esc(down.join(' + ')) + '</b>' : '') +
+      notes;
+  }, false);
+
+  /* ---- physical modifier tracking ----
+     We track which physical keys are actually down (by e.code) rather than
+     trusting e.ctrlKey/e.altKey. Two reasons:
+       1. AltGr (right Alt) makes Windows synthesise a real ControlLeft event,
+          so the flags claim Ctrl is down when it isn't. Key repeat re-fires it,
+          which is why clearing it once wasn't enough.
+       2. The flags can't tell left from right, and we want to light the exact
+          key under your finger. */
+  var heldCodes = Object.create(null);
+  var altGr = false;          // right Alt is acting as AltGr on this layout
+  var ctrlLeftAt = 0;
+
+  function physicalMods() {
+    var m = [];
+    if (heldCodes['ControlLeft'] || heldCodes['ControlRight']) m.push('ctrl');
+    if (heldCodes['AltLeft'] || heldCodes['AltRight']) m.push('alt');
+    if (heldCodes['ShiftLeft'] || heldCodes['ShiftRight']) m.push('shift');
+    if (heldCodes['MetaLeft'] || heldCodes['MetaRight']) m.push('win');
+    return m;
+  }
+
+  function refreshMods() {
+    kbEl.querySelectorAll('.key[data-code]').forEach(function (k) {
+      k.classList.toggle('held', !!heldCodes[k.getAttribute('data-code')]);
+    });
+    var mods = physicalMods();
+    if (mods.join('+') !== heldMods.join('+')) {
+      heldMods = mods;
+      if (mods.length) peek(mods); else clearPeek();
+    }
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (!MODCODE[e.code]) return;
+    if (e.repeat) return;                       // repeats don't change what's down
+    if (e.code === 'ControlLeft') ctrlLeftAt = e.timeStamp;
+    // AltGr arrives as ControlLeft immediately followed by AltRight. A human
+    // pressing Ctrl then right-Alt takes far longer than 60ms.
+    if (e.code === 'AltRight' && heldCodes['ControlLeft'] && (e.timeStamp - ctrlLeftAt) < 60) {
+      altGr = true;
+      delete heldCodes['ControlLeft'];
+    }
+    heldCodes[e.code] = true;
+    refreshMods();
+  }, true);
+
+  document.addEventListener('keyup', function (e) {
+    if (!MODCODE[e.code]) return;
+    delete heldCodes[e.code];
+    if (e.code === 'AltRight' && altGr) { altGr = false; delete heldCodes['ControlLeft']; }
+    refreshMods();
+  }, true);
+
+  // A modifier released while the window was unfocused never sends keyup.
+  // Also make the unfocused state obvious: keys pressed in another app go to
+  // that app, and people reasonably read the silence here as a broken feature.
+  window.addEventListener('blur', function () {
+    heldCodes = Object.create(null); altGr = false; refreshMods();
+    document.body.classList.add('unfocused');
+    probeBody.innerHTML = '<span class="probe-warn">This window is not in front, so keystrokes are going to whatever app is. ' +
+                          'Click anywhere here to start capturing again.</span>';
+  });
+  window.addEventListener('focus', function () {
+    document.body.classList.remove('unfocused');
+    probeBody.textContent = 'press anything — this shows exactly what your keyboard sends, before any interpretation';
+  });
+  window.addEventListener('blur', function () { heldMods = []; clearPeek(); });
+
+  /* ---- click a key to see everything bound to it ---- */
+  kbEl.addEventListener('click', function (e) {
+    var fnEl = e.target.closest('.key.fnkey');
+    if (fnEl) { showFnExplainer(); return; }
+    var el = e.target.closest('.key[data-key]');
+    if (!el) return;
+    showKeyOverview(el.getAttribute('data-key'));
+  });
+
+  function showFnExplainer() {
+    tone('none');
+    ro.innerHTML =
+      '<p class="ro-combo">Fn</p>' +
+      '<p class="ro-sub">This is the one key on your keyboard that no software can see.</p>' +
+      '<div class="kv">' +
+        '<div class="kv-row"><div class="kv-combo">Why</div><div class="kv-claims"><div class="kv-claim"><span class="body">' +
+          '<span class="what">Fn is wired into the keyboard\'s own controller, not the operating system.</span>' +
+          '<span class="why">Ctrl, Alt, Shift and Win all send a scan code to Windows. Fn never does — the keyboard resolves it internally and sends the <em>result</em> instead.</span>' +
+        '</span></div></div></div>' +
+        '<div class="kv-row"><div class="kv-combo">What that means</div><div class="kv-claims"><div class="kv-claim"><span class="body">' +
+          '<span class="what">Fn cannot be detected, remapped, or bound — by this app or any other.</span>' +
+          '<span class="why">Not Claude Code, not VS Code, not PowerToys Keyboard Manager. Pressing Fn here will never light anything up. That is expected, not a fault.</span>' +
+        '</span></div></div></div>' +
+        '<div class="kv-row"><div class="kv-combo">What you can change</div><div class="kv-claims"><div class="kv-claim"><span class="body">' +
+          '<span class="what">Whether F1–F12 need Fn at all.</span>' +
+          '<span class="why">Your BIOS decides whether the F-row sends real F-keys or hardware controls. In Setup — usually reached by holding <b>Esc</b>, <b>F2</b> or <b>F10</b> as the machine boots — look for <b>Action Keys Mode</b>, <b>Function Key Behavior</b> or <b>Hotkey Mode</b> and switch it to standard F-keys. Many laptops also toggle it live with Fn+Esc.</span>' +
+        '</span></div></div></div>' +
+      '</div>' +
+      '<div class="ro-actions"><button class="btn" data-act="idle">Close</button></div>';
+  }
+
+  function showKeyOverview(base) {
+    var combos = {};
+    (KEYMAP[base] || []).forEach(function (it) { combos[it.combo] = 1; });
+    // Simplest first: single keys before chords, fewer modifiers before more.
+    function weight(combo) {
+      var steps = combo.split(' ');
+      return steps.length * 100 + steps.reduce(function (n, s) { return n + s.split('+').length - 1; }, 0);
+    }
+    var list = Object.keys(combos).sort(function (a, z) {
+      return weight(a) - weight(z) || a.localeCompare(z);
+    });
+    var label = CAPS[base] || (base.length === 1 ? base.toUpperCase() : base.toUpperCase());
+
+    if (!list.length) {
+      tone('none');
+      ro.innerHTML = '<p class="ro-combo">' + esc(label) + '</p>' +
+        '<p class="ro-sub">Nothing in the layers you have enabled uses this key. Every combo on it is free.</p>' +
+        '<div class="ro-actions"><button class="btn" data-act="idle">Close</button></div>';
+      return;
+    }
+
+    tone(INDEX[list[0]][0].l);
+
+    var claimTotal = 0;
+    list.forEach(function (c) {
+      claimTotal += INDEX[c].filter(function(h){ return active[h.l]; }).length;
+    });
+    var sub = list.length + ' combination' + (list.length===1?'':'s') + ' use this key';
+    if (claimTotal > list.length) sub += ', claimed by ' + claimTotal + ' bindings in total';
+
+    var html = '<p class="ro-combo">' + esc(label) + '</p>' +
+      '<p class="ro-sub">' + sub + ' — hold a modifier over the keyboard to see what each one unlocks</p>' +
+      '<div class="kv">';
+
+    list.forEach(function (combo) {
+      var claims = INDEX[combo].filter(function(h){ return active[h.l]; });
+      if (!claims.length) return;
+      var steps = combo.split(' ').map(pretty);
+      var comboHtml = steps.length > 1
+        ? esc(steps[0]) + ' <span class="step">then</span> ' + esc(steps[1])
+        : esc(steps[0]);
+      html += '<div class="kv-row"><div class="kv-combo">' + comboHtml + '</div><div class="kv-claims">';
+      claims.forEach(function (h, i) {
+        var beaten = i > 0 && (claims[0].l === 'powertoys' || claims[0].l === 'windows');
+        html += '<div class="kv-claim' + (i > 0 ? ' loses' : '') + '">' +
+          '<span class="lchip" data-l="'+h.l+'">'+LAYERS[h.l].name+'</span>' +
+          '<span class="body"><span class="what">'+esc(h.t)+'</span>' +
+          (h.n ? '<span class="why">'+esc(h.n)+'</span>' : '') +
+          (beaten ? '<span class="why kv-beaten">never fires — ' + esc(LAYERS[claims[0].l].name) + ' takes this key first</span>' : '') +
+          '</span></div>';
+      });
+      html += '</div></div>';
+    });
+
+    html += '</div><div class="ro-actions"><button class="btn" data-act="idle">Close</button></div>';
+    ro.innerHTML = html;
+  }
+
+  /* ============ readout ============ */
+  var ro = document.getElementById('readout');
+  function tone(t){ ro.setAttribute('data-tone', t); }
+
+  function showIdle(msg) {
+    tone('none');
+    ro.innerHTML = '<p class="ro-hint">' + (msg ||
+      'Click anywhere first, then press a shortcut — <kbd>Ctrl+Shift+P</kbd>, <kbd>Ctrl+X</kbd>, <kbd>Alt+P</kbd>. ' +
+      "I'll show every layer that claims it, and offer to bind it in Claude Code if nothing does.") + '</p>';
+  }
+
+  function showMatches(combo, hits, chordOpts) {
+    tone(hits[0].l);
+    var osHit = hits.filter(function(h){ return h.os; })[0];
+    var html = '<p class="ro-combo">' + prettyCombo(combo) + (chordOpts && chordOpts.length ? ' …' : '') + '</p>';
+    html += '<p class="ro-sub">' + hits.length + (hits.length === 1 ? ' layer claims this key' : ' layers claim this key');
+    if (chordOpts && chordOpts.length) {
+      html += ' — <strong>and it also starts a Claude chord.</strong> Press ' +
+              esc(chordOpts.map(function(k){ return pretty(k.split(' ')[1]); }).join(', ')) +
+              ' within 3s to continue';
+    }
+    html += '</p>';
+    html += '<ul class="ro-list">';
+    hits.forEach(function (h, i) {
+      html += '<li class="ro-item' + (i===0?' wins':'') + '">' +
+              '<span class="lchip" data-l="'+h.l+'">'+LAYERS[h.l].name+'</span>' +
+              '<span><span class="what">'+esc(h.t)+'</span>' +
+              (h.n ? '<span class="why">'+esc(h.n)+'</span>' : '') + '</span></li>';
+    });
+    html += '</ul>';
+    if (osHit) {
+      html += '<p class="ro-wins-note">Windows intercepts this before any app sees it — the other layers never fire.</p>';
+    } else if (hits.length > 1) {
+      html += '<p class="ro-wins-note">Top row wins while Claude\'s prompt box has focus. Click into the editor and the VS Code binding takes over instead.</p>';
+    }
+    html += '<div class="ro-actions"><button class="btn" data-act="rebind" data-combo="'+esc(combo)+'">Bind this in Claude Code…</button>';
+    hits.filter(function(h){ return h.mine || h.l === 'custom'; }).forEach(function (h) {
+      html += '<button class="btn" data-act="remove" data-combo="'+esc(h.raw || combo)+'"' +
+              ' data-ctx="'+esc(h.ctx||'Chat')+'" data-target="'+esc(h.target||'claude')+'">' +
+              'Remove your ' + (h.target === 'vscode' ? 'VS Code' : 'Claude Code') + ' binding</button>';
+    });
+    html += '</div>';
+    ro.innerHTML = html;
+  }
+
+  // One form for both "this is free, bind it" and "rebind this", targeting
+  // either app. Only Claude Code and VS Code are writable.
+  function assignForm(combo, hits, freeText) {
+    var claimed = hits && hits.length;
+    var blocked = claimed && hits.filter(function(h){ return h.l==='powertoys' || h.l==='windows'; })[0];
+
+    var sub;
+    if (freeText) sub = freeText;
+    else if (!claimed) sub = "Nothing claims this — not Claude Code, VS Code, Windows, PowerToys or your own bindings. It's free.";
+    else sub = 'Already used by ' + esc(hits.map(function(h){ return LAYERS[h.l].name + ' (' + h.t + ')'; }).join('; ')) +
+               '. Binding it below only changes that one app.';
+
+    var warn = blocked
+      ? '<p class="ro-sub kv-beaten">Heads up: ' + esc(LAYERS[blocked.l].name) + ' grabs this combo system-wide, so whatever you bind here will most likely never fire. Pick another combo, or rebind it in ' + esc(LAYERS[blocked.l].name) + ' first.</p>'
+      : '';
+
+    ro.innerHTML =
+      '<p class="ro-combo">' + prettyCombo(combo) + '</p>' +
+      '<p class="ro-sub">' + sub + '</p>' + warn +
+      '<div class="ro-actions">' +
+        '<label>Bind in <select data-role="target">' +
+          '<option value="claude">Claude Code</option>' +
+          '<option value="vscode">VS Code</option>' +
+        '</select></label>' +
+        '<span data-role="fields"></span>' +
+        '<button class="btn primary" data-act="assign" data-combo="'+esc(combo)+'">Assign</button>' +
+        '<button class="btn" data-act="idle">Cancel</button>' +
+      '</div>';
+    renderTargetFields('claude');
+  }
+
+  function renderTargetFields(target) {
+    var host = ro.querySelector('[data-role="fields"]');
+    if (!host) return;
+    if (target === 'vscode') {
+      var cmds = '<option value="" disabled selected>— pick a command —</option><option value="__cmd__">Type a command ID…</option>';
+      Object.keys(VSCODE_COMMANDS).forEach(function (grp) {
+        cmds += '<optgroup label="'+grp+'">';
+        VSCODE_COMMANDS[grp].forEach(function (c) {
+          cmds += '<option value="'+c[0]+'">'+esc(c[1])+'</option>';
+        });
+        cmds += '</optgroup>';
+      });
+      var whens = VSCODE_WHEN.map(function(w){
+        return '<option value="'+w+'">'+(w || 'always')+'</option>';
+      }).join('');
+      host.innerHTML =
+        '<label>Command <select data-role="act">'+cmds+'</select></label>' +
+        '<input type="text" data-role="cmd" placeholder="e.g. editor.action.formatDocument" style="display:none">' +
+        '<label>When <select data-role="when">'+whens+'</select></label>';
+    } else {
+      var acts = '<option value="" disabled selected>— pick an action —</option><option value="__cmd__">Run a slash command…</option>';
+      Object.keys(ACTIONS).forEach(function (ns) {
+        acts += '<optgroup label="'+ns+'">';
+        ACTIONS[ns].forEach(function(a){ acts += '<option value="'+ns+':'+a+'">'+ns+':'+a+'</option>'; });
+        acts += '</optgroup>';
+      });
+      var ctxs = CONTEXTS.map(function(c){ return '<option value="'+c+'"'+(c==='Chat'?' selected':'')+'>'+c+'</option>'; }).join('');
+      host.innerHTML =
+        '<label>Context <select data-role="ctx">'+ctxs+'</select></label>' +
+        '<label>Action <select data-role="act">'+acts+'</select></label>' +
+        '<input type="text" data-role="cmd" placeholder="command name, e.g. commit" style="display:none">';
+    }
+  }
+
+  function showUnclaimed(combo) { tone('none'); assignForm(combo, []); }
+  function showRebind(combo, hits) { tone('custom'); assignForm(combo, hits); }
+
+  function showWaiting(step, opts) {
+    tone('claude');
+    var next = opts.map(function(k){ return pretty(k.split(' ')[1]); }).join(', ');
+    ro.innerHTML = '<p class="ro-combo">' + pretty(step) + ' …</p>' +
+      '<p class="ro-sub">Chord started — press the second key within 3 seconds. Options: ' + esc(next) + '</p>';
+  }
+
+  function showResult(combo, msg, ok) {
+    tone(ok ? 'custom' : 'none');
+    ro.innerHTML = '<p class="ro-combo">' + prettyCombo(combo) + '</p><p class="ro-sub">' + esc(msg) + '</p>';
+  }
+
+  function showFallback(combo, ctx, action) {
+    tone('none');
+    var snip = '{\n  "$schema": "https://www.schemastore.org/claude-code-keybindings.json",\n  "bindings": [\n    {\n      "context": "'+ctx+'",\n      "bindings": {\n        "'+combo+'": "'+action+'"\n      }\n    }\n  ]\n}';
+    ro.innerHTML =
+      '<p class="ro-combo">' + prettyCombo(combo) + '</p>' +
+      '<p class="ro-sub">Couldn\'t reach the local helper, so nothing was written. Merge this into <code>~/.claude/keybindings.json</code> yourself:</p>' +
+      '<pre class="snippet">' + esc(snip) + '</pre>' +
+      '<div class="ro-actions"><button class="btn" data-act="copy" data-payload="'+encodeURIComponent(snip)+'">Copy</button>' +
+      '<button class="btn" data-act="idle">Dismiss</button></div>';
+  }
+
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  /* ============ assign ============ */
+  function assign(ctx, combo, action, force, target, when) {
+    target = target || 'claude';
+    api('/api/assign', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ context:ctx, keystroke:combo, action:action,
+                             force:!!force, target:target, when:when || '' })
+    }).then(function (res) {
+      if (res.status === 409) {
+        return res.json().then(function (d) {
+          tone('none');
+          ro.innerHTML = '<p class="ro-combo">'+prettyCombo(combo)+'</p>' +
+            '<p class="ro-sub">Your keybindings file already maps this in '+esc(ctx)+' to <code>'+esc(d.existing)+'</code>. Overwrite?</p>' +
+            '<div class="ro-actions">' +
+            '<button class="btn primary" data-act="force" data-combo="'+esc(combo)+'" data-ctx="'+esc(ctx)+'" data-action="'+esc(action)+'"' +
+            ' data-target="'+esc(target)+'" data-when="'+esc(when || '')+'">Overwrite</button>' +
+            '<button class="btn" data-act="idle">Cancel</button></div>';
+        });
+      }
+      return res.json().then(function (d) {
+        if (d.ok) {
+          CUSTOM = CUSTOM.filter(function(e){ return !(e.c === combo && e.target === target); });
+          CUSTOM.push({ c:combo, l: target === 'vscode' ? 'vscode' : 'custom', t:action,
+                        ctx:ctx, raw:combo, target:target, mine:true,
+                        n: target === 'vscode' ? 'your VS Code binding' : 'your binding · context '+ctx });
+          indexAll(); paintKeyboard(); renderTable(); refreshFilterCounts();
+          showResult(combo, 'Bound to ' + action + ' and written to ' + d.path + '.', true);
+        } else {
+          showResult(combo, 'Could not write: ' + (d.error || 'unknown error'), false);
+        }
+      });
+    }).catch(function(){ showFallback(combo, ctx, action); });
+  }
+
+  ro.addEventListener('change', function (e) {
+    if (e.target.matches('[data-role="target"]')) { renderTargetFields(e.target.value); return; }
+    if (e.target.matches('[data-role="act"]')) {
+      var cmd = ro.querySelector('[data-role="cmd"]');
+      if (cmd) cmd.style.display = e.target.value === '__cmd__' ? 'inline-block' : 'none';
+    }
+  });
+
+  ro.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]');
+    if (!b) return;
+    var act = b.getAttribute('data-act');
+
+    if (act === 'idle') { addMode = false; showIdle(); return; }
+
+    if (act === 'copy') {
+      var txt = decodeURIComponent(b.getAttribute('data-payload'));
+      if (navigator.clipboard) navigator.clipboard.writeText(txt).catch(function(){});
+      b.textContent = 'Copied'; setTimeout(function(){ b.textContent='Copy'; }, 1400);
+      return;
+    }
+
+    if (act === 'rebind') { showRebind(b.getAttribute('data-combo'), lookup(b.getAttribute('data-combo'))); return; }
+
+    if (act === 'pickfree') {
+      var fc = b.getAttribute('data-combo');
+      tone('custom');
+      assignForm(fc, [], 'Free on this machine — nothing claims it. Pick where it should live.');
+      return;
+    }
+
+    if (act === 'remove') {
+      var rc = b.getAttribute('data-combo'), rctx = b.getAttribute('data-ctx');
+      var rtarget = b.getAttribute('data-target') || 'claude';
+      api('/api/unassign', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ context: rctx, keystroke: rc, target: rtarget })
+      }).then(function(r){ return r.json(); }).then(function (d) {
+        if (!d.ok) { showResult(rc, 'Could not remove: ' + (d.error||'unknown'), false); return; }
+        var norm = rc.split(' ').map(normalise).join(' ');
+        CUSTOM = CUSTOM.filter(function(e){ return !(e.c === norm && (e.target||'claude') === rtarget); });
+        indexAll(); paintKeyboard(); renderTable(); refreshFilterCounts();
+        showResult(norm, d.removed ? 'Removed from ' + d.path + '.' : 'It was not in your keybindings file.', true);
+      }).catch(function(){ showResult(rc, 'Local helper unreachable — nothing was changed.', false); });
+      return;
+    }
+
+    if (act === 'force') {
+      // Carry the target through, or a VS Code overwrite lands in Claude Code's file.
+      assign(b.getAttribute('data-ctx'), b.getAttribute('data-combo'), b.getAttribute('data-action'),
+             true, b.getAttribute('data-target') || 'claude', b.getAttribute('data-when') || '');
+      return;
+    }
+
+    if (act === 'assign') {
+      var combo = b.getAttribute('data-combo');
+      var target = (ro.querySelector('[data-role="target"]') || {}).value || 'claude';
+      var ctxEl = ro.querySelector('[data-role="ctx"]');
+      var ctx = ctxEl ? ctxEl.value : '-';
+      var sel = ro.querySelector('[data-role="act"]');
+      var action = sel.value;
+      if (!action) { sel.focus(); return; }
+      if (action === '__cmd__') {
+        var cmd = ro.querySelector('[data-role="cmd"]');
+        if (!cmd.value.trim()) { cmd.focus(); return; }
+        action = target === 'vscode' ? cmd.value.trim() : 'command:' + cmd.value.trim();
+      }
+      var whenEl = ro.querySelector('[data-role="when"]');
+      assign(ctx, combo, action, false, target, whenEl ? whenEl.value : '');
+    }
+  });
+
+  /* ============ table ============ */
+  var tblEl = document.getElementById('tbl');
+  var countEl = document.getElementById('tblCount');
+  var searchEl = document.getElementById('search');
+
+  function renderTable() {
+    var q = searchEl.value.trim().toLowerCase();
+    var all = allEntries().filter(function (e) {
+      if (!active[e.l]) return false;
+      if (!q) return true;
+      return (e.c + ' ' + prettyCombo(e.c.split(' ').map(normalise).join(' ')) + ' ' + e.t + ' ' + (e.n||'') + ' ' + LAYERS[e.l].name)
+        .toLowerCase().indexOf(q) >= 0;
+    });
+    all.sort(function (a, b) {
+      if (a.l !== b.l) return LAYER_ORDER.indexOf(a.l) - LAYER_ORDER.indexOf(b.l);
+      return a.c.localeCompare(b.c);
+    });
+    countEl.textContent = all.length + ' of ' + allEntries().length;
+    if (!all.length) { tblEl.innerHTML = '<div class="empty">Nothing matches that search in the layers you have enabled.</div>'; return; }
+    tblEl.innerHTML = all.map(function (e) {
+      var combo = e.c.split(' ').map(normalise).join(' ');
+      return '<div class="row">' +
+        '<span class="rk">' + esc(prettyCombo(combo)) + (e.os ? ' <span style="color:var(--ink-faint)">·OS</span>' : '') + '</span>' +
+        '<span><span class="lchip" data-l="'+e.l+'">'+LAYERS[e.l].name+'</span></span>' +
+        '<span class="rd">' + esc(e.t) + (e.n ? '<em>'+esc(e.n)+'</em>' : '') + '</span>' +
+      '</div>';
+    }).join('');
+  }
+  searchEl.addEventListener('input', renderTable);
+
+  /* ============ capture ============ */
+  var pending = null, addMode = false;
+
+  function endPending(timedOut) {
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    var first = pending.step; pending = null;
+    if (timedOut) showIdle(pretty(first) + ' timed out waiting for a second key.');
+  }
+
+  function handle(step) {
+    if (pending) {
+      var combo = pending.step + ' ' + step;
+      clearTimeout(pending.timer); pending = null;
+      var hits = lookup(combo);
+      if (hits.length) { flash(combo, 'hit'); showMatches(combo, hits); }
+      else { flash(combo, 'miss'); showUnclaimed(combo); }
+      return;
+    }
+    var direct = lookup(step);
+    var prefixes = chordPrefixes(step);
+    if (prefixes.length) {
+      flash(step, 'hit');
+      if (direct.length) showMatches(step, direct, prefixes);
+      else showWaiting(step, prefixes);
+      pending = { step: step, timer: setTimeout(function(){ clearFlash(); endPending(true); }, 3000) };
+      return;
+    }
+    if (direct.length) { flash(step, 'hit'); showMatches(step, direct); return; }
+    flash(step, 'miss'); showUnclaimed(step);
+  }
+
+  /* ---- find combos nothing on this machine claims ---- */
+  var COMFY = 'abcdefghijklmnopqrstuvwxyz0123456789'.split('');
+  var MODSETS = [
+    ['ctrl','alt'], ['ctrl','shift'], ['ctrl','alt','shift'], ['alt','shift']
+  ];
+  function findFree(limit) {
+    var out = [];
+    MODSETS.forEach(function (mods) {
+      COMFY.forEach(function (k) {
+        if (out.length >= limit) return;
+        var combo = mods.concat(k).join('+');
+        if (INDEX[combo]) return;               // claimed by some layer
+        if (mods.indexOf('alt') >= 0 && /^[0-9]$/.test(k)) return;  // Alt+digit is menu-ish
+        out.push(combo);
+      });
+    });
+    return out;
+  }
+  document.getElementById('freeBtn').addEventListener('click', function () {
+    this.blur();
+    var free = findFree(18);
+    tone('custom');
+    if (!free.length) {
+      ro.innerHTML = '<p class="ro-combo">No free combos</p>' +
+        '<p class="ro-sub">Every Ctrl/Alt/Shift letter and digit combination is already claimed by something. Try a chord instead.</p>' +
+        '<div class="ro-actions"><button class="btn" data-act="idle">Close</button></div>';
+      return;
+    }
+    ro.innerHTML = '<p class="ro-combo">' + free.length + ' free combinations</p>' +
+      '<p class="ro-sub">Nothing on this machine claims these — not Claude Code, VS Code, Windows, PowerToys, your shell, or your own bindings. Click one to bind it.</p>' +
+      '<div class="ro-actions">' + free.map(function (c) {
+        return '<button class="btn" data-act="pickfree" data-combo="'+c+'">'+esc(pretty(c))+'</button>';
+      }).join('') + '</div>' +
+      '<div class="ro-actions"><button class="btn" data-act="idle">Close</button></div>';
+  });
+
+  document.getElementById('addBtn').addEventListener('click', function () {
+    addMode = true; endPending(); clearFlash(); tone('custom');
+    ro.innerHTML = '<p class="ro-combo">Listening…</p><p class="ro-sub">Press the combo you want to bind in Claude Code.</p>' +
+      '<div class="ro-actions"><button class="btn" data-act="idle">Cancel</button></div>';
+    this.blur();
+  });
+
+  var capture = true;
+  var captureBtn = document.getElementById('captureBtn');
+  function setCapture(on) {
+    capture = on;
+    captureBtn.classList.toggle('capture-on', on);
+    captureBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    captureBtn.textContent = on ? '● Capture: on' : '○ Capture: off';
+    captureBtn.title = on
+      ? 'Shortcuts are swallowed by this window and reported instead of running. Click to let them work normally.'
+      : 'Shortcuts run normally (Ctrl+C copies, etc.) and are still reported. Click to swallow them again.';
+  }
+  captureBtn.addEventListener('click', function () { setCapture(!capture); this.blur(); });
+  setCapture(true);
+
+  document.addEventListener('keydown', function (e) {
+    var el = document.activeElement;
+    var tag = el && el.tagName;
+    // Text entry always wins. A focused <select> only needs the keys that
+    // operate it — everything else must still reach the detector, otherwise
+    // clicking a dropdown silently kills the whole app.
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (tag === 'SELECT' &&
+        ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Escape','Space','Home','End'].indexOf(e.code) >= 0) return;
+
+    var base = CODE[e.code];
+    if (!base || base === 'capslock') return;
+
+    var mods = [];
+    if (e.ctrlKey) mods.push('ctrl');
+    if (e.altKey) mods.push('alt');
+    if (e.shiftKey) mods.push('shift');
+    if (e.metaKey) mods.push('win');
+    var step = mods.concat(base).join('+');
+
+    if (addMode) {
+      e.preventDefault(); addMode = false;
+      var hits = lookup(step);
+      flash(step, hits.length ? 'hit' : 'miss');
+      showRebind(step, hits);
+      return;
+    }
+
+    var bare = !mods.length;
+    // Tab is never swallowed. Capture used to eat it, which left the whole app
+    // unusable without a mouse — you could not even reach the search box. It is
+    // still explained, but only when focus is outside the readout, since
+    // redrawing the readout would throw away the focus you are moving.
+    if (base === 'tab' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      if (!ro.contains(document.activeElement)) handle(step);
+      return;
+    }
+    // Enter/Space must stay available so buttons remain keyboard-operable
+    if (bare && ['enter','space'].indexOf(base) >= 0) return;
+    // plain letters and digits are typing, not shortcuts
+    if (bare && base.length === 1) return;
+
+    // With capture on, swallow it so the shortcut is reported instead of run.
+    if (capture) e.preventDefault();
+    handle(step);
+  }, true);
+
+  // Ctrl+wheel zoom is a separate event stream from keydown — pywebview leaves
+  // IsZoomControlEnabled on, so block it here too while capturing.
+  document.addEventListener('wheel', function (e) {
+    if (capture && e.ctrlKey) e.preventDefault();
+  }, { passive: false, capture: true });
+
+  /* ============ theme ============ */
+  var themeBtn = document.getElementById('themeBtn');
+  var root = document.documentElement;
+  // localStorage throws on opaque origins (e.g. if this file is opened over file://).
+  // Guard it so a storage failure can never take the whole script down.
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+  root.setAttribute('data-theme', store('hotkeyhq-theme') || 'light');
+  themeBtn.addEventListener('click', function () {
+    var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    store('hotkeyhq-theme', next);
+    this.blur();
+  });
+
+  /* ============ board controls ============ */
+  var layoutSel = document.getElementById('layoutSel');
+  var fnChip = document.getElementById('fnChip');
+  var layoutNote = document.getElementById('layoutNote');
+
+  Object.keys(LAYOUTS).forEach(function (id) {
+    var o = document.createElement('option');
+    o.value = id; o.textContent = LAYOUTS[id].name;
+    if (id === layoutId) o.selected = true;
+    layoutSel.appendChild(o);
+  });
+  function syncBoardNote() {
+    var L = LAYOUTS[layoutId];
+    layoutNote.textContent = L ? L.note : '';
+    fnChip.setAttribute('aria-pressed', hasFn ? 'true' : 'false');
+    fnChip.title = hasFn ? FN_NOTE : 'Turn on if your keyboard has an Fn key.';
+  }
+  layoutSel.addEventListener('change', function () {
+    layoutId = this.value; store('hotkeyhq-layout', layoutId);
+    // Desktop boards have no Fn key; laptops do. Still overridable below.
+    var def = LAYOUTS[layoutId] && LAYOUTS[layoutId].fn;
+    if (def !== undefined) { hasFn = def; store('hotkeyhq-fn', hasFn ? '1' : '0'); }
+    buildKeyboard(); syncBoardNote(); this.blur();
+  });
+  fnChip.addEventListener('click', function () {
+    hasFn = !hasFn; store('hotkeyhq-fn', hasFn ? '1' : '0');
+    buildKeyboard(); syncBoardNote(); this.blur();
+  });
+
+  /* ============ boot ============ */
+  indexAll(); buildFilters(); buildKeyboard(); renderTable(); syncBoardNote();
+
+  var verifiedEl = document.getElementById('verifiedNote');
+  var versionEl = document.getElementById('versionNote');
+  if (verifiedEl) verifiedEl.textContent = VERIFIED || 'no version recorded';
+  if (versionEl) versionEl.textContent = VERSION ? 'Hotkey HQ v' + VERSION + '.' : '';
+
+  var ptSkipped = 0;
+
+  api('/api/keybindings').then(function(r){ return r.ok ? r.json() : null; }).then(function (cfg) {
+    if (!cfg || !Array.isArray(cfg.bindings)) return;
+    cfg.bindings.forEach(function (block) {
+      var bindings = block.bindings || {};
+      Object.keys(bindings).forEach(function (ks) {
+        var action = bindings[ks];
+        if (action === null) return;
+        CUSTOM.push({ c: ks.split(' ').map(normalise).join(' '), l:'custom', t:action,
+                      ctx: block.context, raw: ks,
+                      n:'your binding · context ' + block.context });
+      });
+    });
+    indexAll(); paintKeyboard(); renderTable(); refreshFilterCounts();
+  }).catch(function(){});
+
+  // The user's own VS Code keybindings.json — both what they added and what
+  // they switched off.
+  api('/api/vscode').then(function(r){ return r.ok ? r.json() : null; }).then(function (v) {
+    if (!v) return;
+    (v.removals || []).forEach(function (r) {
+      if (r && r.key) SUPPRESSED[String(r.key).split(' ').map(normalise).join(' ')] = true;
+    });
+    (v.bindings || []).forEach(function (b) {
+      if (!b || !b.key || !b.command) return;
+      CUSTOM.push({
+        c: String(b.key).split(' ').map(normalise).join(' '),
+        l: 'vscode', t: b.command, target: 'vscode', mine: true, raw: b.key,
+        n: 'your VS Code binding' + (b.when ? ' · when ' + b.when : '')
+      });
+    });
+    indexAll(); paintKeyboard(); renderTable(); refreshFilterCounts();
+  }).catch(function(){});
+
+  // The user's own Windows Terminal bindings, on the Terminal layer.
+  api('/api/terminal').then(function(r){ return r.ok ? r.json() : null; }).then(function (t) {
+    if (!t || !t.bindings || !t.bindings.length) return;
+    t.bindings.forEach(function (b) {
+      CUSTOM.push({
+        c: String(b.combo).split(' ').map(normalise).join(' '),
+        l: 'shell', t: b.action,
+        n: 'your Windows Terminal binding'
+      });
+    });
+    indexAll(); paintKeyboard(); renderTable(); refreshFilterCounts();
+  }).catch(function(){});
+
+  // Live PowerToys hotkeys, read from the user's own settings. Modules they have
+  // switched off are left out by the server — a disabled module presses nothing.
+  api('/api/powertoys').then(function(r){ return r.ok ? r.json() : null; }).then(function (pt) {
+    if (!pt) return;
+    ptSkipped = pt.skipped || 0;
+    if (!pt.shortcuts || !pt.shortcuts.length) return;
+    pt.shortcuts.forEach(function (s) {
+      CUSTOM.push({
+        c: s.combo.split(' ').map(normalise).join(' '),
+        l: 'powertoys',
+        t: s.module + (s.action && s.action !== 'Activate' ? ' — ' + s.action : ''),
+        n: 'PowerToys grabs this system-wide before any app sees it',
+        os: true
+      });
+    });
+    indexAll(); paintKeyboard(); renderTable(); refreshFilterCounts();
+    flagPowerToysClashes();
+  }).catch(function(){});
+
+  // Surface combos where PowerToys silently shadows an app shortcut.
+  function flagPowerToysClashes() {
+    var clashes = [];
+    Object.keys(INDEX).forEach(function (combo) {
+      var hits = INDEX[combo];
+      var pt = hits.filter(function(h){ return h.l === 'powertoys'; });
+      var others = hits.filter(function(h){ return h.l !== 'powertoys' && h.l !== 'windows'; });
+      if (pt.length && others.length) clashes.push({ combo: combo, pt: pt[0], others: others });
+    });
+    if (!clashes.length) return;
+    var box = document.getElementById('ptClash');
+    box.style.display = 'block';
+    box.innerHTML = '<h3>' + clashes.length + ' PowerToys shortcut' + (clashes.length===1?'':'s') +
+      ' shadowing something else on this machine</h3>' +
+      '<p style="margin:0 0 9px; font-size:13.5px; color:var(--ink-soft);">PowerToys uses a system-wide keyboard hook, so it fires first and the app binding below it never runs. Rebind in PowerToys Settings if you want the app one back.' +
+      (ptSkipped ? ' Modules you have switched off are not counted — ' + ptSkipped + ' of them were skipped.' : '') + '</p>' +
+      '<ul>' + clashes.map(function (c) {
+        return '<li><code>' + esc(prettyCombo(c.combo)) + '</code> — <strong>' + esc(c.pt.t) + '</strong> wins over ' +
+               esc(c.others.map(function(o){ return LAYERS[o.l].name + ': ' + o.t; }).join(', ')) + '</li>';
+      }).join('') + '</ul>';
+  }
+
+})();
+</script>
+</body>
+</html>
