@@ -84,9 +84,27 @@ API call must present a one-time token that the server injects into the page as 
 serves it, and requests carrying another site's `Origin` are refused. A website
 cannot use this app to touch your keybindings.
 
-It writes only to the two keybinding files above, and only when you click Assign
-or Remove — taking a one-time backup of the VS Code one first, since that file may
-contain comments that get lost when it is rewritten as plain JSON.
+Those two checks are the actual defence, not a secret. Reading this source tells
+you how they work and does not help you past them: the token is regenerated every
+run and never leaves the page it was served to, and the `Origin` rule is enforced
+on the server. Nothing here relies on you not knowing how it works.
+
+### What it writes
+
+Only when you ask it to, and never on startup alone:
+
+| When you | It writes |
+| --- | --- |
+| Click Assign or Remove | `~/.claude/keybindings.json`, or VS Code's `keybindings.json` — taking a one-time backup of the VS Code one first, since that file may contain comments that are lost when it is rewritten as plain JSON |
+| Resolve a PowerToys conflict | That module's `settings.json`, after a one-time `.hotkeyhq-backup` copy beside it |
+| Export a cheat sheet | One Markdown file inside your Obsidian vault |
+| Change any binding | A timestamped copy of every keybinding file into `snapshots/`, so you can restore an earlier state. Restoring rewrites the files that snapshot covers |
+
+Rebinding a PowerToys hotkey also **restarts PowerToys** — a `taskkill /F` on
+`PowerToys.exe` followed by relaunching it. PowerToys reads most hotkeys once at
+module start, so editing its settings file without a restart leaves the old key
+live and the app silently wrong about who owns it. This happens only on that one
+action, never on launch.
 
 ## Running it twice
 
@@ -107,6 +125,7 @@ interface.
 | `icon.ico` | App icon |
 | `LICENSE` | MIT licence |
 | `hotkey-hq.log` | Written at runtime; startup failures land here |
+| `snapshots/` | Written at runtime; timestamped copies of your keybinding files |
 
 ## Licence
 
