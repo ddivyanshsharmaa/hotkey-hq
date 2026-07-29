@@ -42,6 +42,9 @@
     --L-shell:    #67489f;
     --L-custom:   #7a7420;
     --L-powertoys:#a8306f;
+    --L-obsidian: #6b3fa0;
+    --L-chrome:   #1a7f37;
+    --L-excel:    #8a5a00;
     --lit-ink:    #ffffff;
 
     --shadow-key: 0 2px 0 var(--keycap-edge);
@@ -54,7 +57,7 @@
       --line-soft:#2a2e32; --keycap:#2b2f34; --keycap-mod:#1f2327; --keycap-edge:#121417;
       --ink:#e9ebe6; --ink-soft:#b0b5ac; --ink-faint:#7b8179; --code-bg:#0e1013; --code-ink:#e4e7de;
       --L-claude:#f0906b; --L-vscode:#6fb7e8; --L-windows:#4ecab8; --L-text:#a89e90;
-      --L-shell:#b49ae8; --L-custom:#c9c15e; --L-powertoys:#f08cc0; --lit-ink:#15171a;
+      --L-shell:#b49ae8; --L-custom:#c9c15e; --L-powertoys:#f08cc0; --lit-ink:#15171a; --L-obsidian:#b99ae8; --L-chrome:#68d391; --L-excel:#e0b357;
       --shadow-key: 0 2px 0 var(--keycap-edge);
       --shadow-panel: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
     }
@@ -64,7 +67,7 @@
     --line-soft:#2a2e32; --keycap:#2b2f34; --keycap-mod:#1f2327; --keycap-edge:#121417;
     --ink:#e9ebe6; --ink-soft:#b0b5ac; --ink-faint:#7b8179; --code-bg:#0e1013; --code-ink:#e4e7de;
     --L-claude:#f0906b; --L-vscode:#6fb7e8; --L-windows:#4ecab8; --L-text:#a89e90;
-    --L-shell:#b49ae8; --L-custom:#c9c15e; --L-powertoys:#f08cc0; --lit-ink:#15171a;
+    --L-shell:#b49ae8; --L-custom:#c9c15e; --L-powertoys:#f08cc0; --lit-ink:#15171a; --L-obsidian:#b99ae8; --L-chrome:#68d391; --L-excel:#e0b357;
     --shadow-key: 0 2px 0 var(--keycap-edge);
     --shadow-panel: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
   }
@@ -185,6 +188,9 @@
   .lchip[data-l="shell"]   { background:var(--L-shell); }
   .lchip[data-l="custom"]  { background:var(--L-custom); }
   .lchip[data-l="powertoys"]{ background:var(--L-powertoys); }
+  .lchip[data-l="obsidian"]{ background:var(--L-obsidian); }
+  .lchip[data-l="chrome"]  { background:var(--L-chrome); }
+  .lchip[data-l="excel"]   { background:var(--L-excel); }
   :root[data-theme="dark"] .lchip, :root:not([data-theme]) .lchip { color:#15171a; }
   @media (prefers-color-scheme: light) { :root:not([data-theme]) .lchip { color:#fff; } }
   :root[data-theme="light"] .lchip { color:#fff; }
@@ -267,6 +273,9 @@
   .kdot[data-l="shell"]    { background:var(--L-shell); }
   .kdot[data-l="custom"]   { background:var(--L-custom); }
   .kdot[data-l="powertoys"]{ background:var(--L-powertoys); }
+  .kdot[data-l="obsidian"] { background:var(--L-obsidian); }
+  .kdot[data-l="chrome"]   { background:var(--L-chrome); }
+  .kdot[data-l="excel"]    { background:var(--L-excel); }
   .kcount { margin-left:auto; font-family:var(--mono); font-size:8.5px; line-height:1; color:var(--ink-faint); }
 
   .key[data-key] { cursor:pointer; }
@@ -454,9 +463,12 @@
     custom:  { name: 'Yours',       rank: 1 },
     shell:   { name: 'Terminal',    rank: 2 },
     vscode:  { name: 'VS Code',     rank: 3 },
+    obsidian:{ name: 'Obsidian',    rank: 3 },
+    chrome:  { name: 'Chrome',      rank: 3 },
+    excel:   { name: 'Excel',       rank: 3 },
     text:    { name: 'Text edit',   rank: 4 }
   };
-  var LAYER_ORDER = ['claude','custom','powertoys','vscode','windows','shell','text'];
+  var LAYER_ORDER = ['claude','custom','powertoys','vscode','obsidian','chrome','excel','windows','shell','text'];
 
   /* ============ shortcut data ============
      combo: space-separated steps for chords. os:true => OS eats it, page can't capture. */
@@ -607,7 +619,58 @@
     { c:'f11',           l:'text',   t:'Toggle fullscreen', n:'' },
     { c:'ctrl+=',        l:'text',   t:'Zoom in', n:'This window swallows it while capture is on' },
     { c:'ctrl+-',        l:'text',   t:'Zoom out', n:'This window swallows it while capture is on' },
-    { c:'ctrl+0',        l:'text',   t:'Reset zoom', n:'This window swallows it while capture is on' }
+    { c:'ctrl+0',        l:'text',   t:'Reset zoom', n:'This window swallows it while capture is on' },
+
+    // ---- Obsidian (factory defaults; your customised ones load live) ----
+    { c:'ctrl+o',        l:'obsidian', t:'Quick switcher — open a note by name', n:'' },
+    { c:'ctrl+p',        l:'obsidian', t:'Command palette', n:'Unless you have rebound it' },
+    { c:'ctrl+n',        l:'obsidian', t:'New note', n:'' },
+    { c:'ctrl+e',        l:'obsidian', t:'Toggle edit / reading view', n:'' },
+    { c:'ctrl+f',        l:'obsidian', t:'Search this note', n:'' },
+    { c:'ctrl+shift+f',  l:'obsidian', t:'Search all notes', n:'' },
+    { c:'ctrl+g',        l:'obsidian', t:'Open graph view', n:'' },
+    { c:'ctrl+k',        l:'obsidian', t:'Insert link', n:'' },
+    { c:'ctrl+b',        l:'obsidian', t:'Bold', n:'' },
+    { c:'ctrl+i',        l:'obsidian', t:'Italic', n:'' },
+    { c:'ctrl+,',        l:'obsidian', t:'Settings', n:'' },
+    { c:'ctrl+w',        l:'obsidian', t:'Close tab', n:'', os:true },
+    { c:'ctrl+enter',    l:'obsidian', t:'Follow link under cursor', n:'' },
+
+    // ---- Chrome / Edge ----
+    { c:'ctrl+t',        l:'chrome', t:'New tab', n:'' },
+    { c:'ctrl+w',        l:'chrome', t:'Close tab', n:'', os:true },
+    { c:'ctrl+shift+t',  l:'chrome', t:'Reopen the last closed tab', n:'' },
+    { c:'ctrl+shift+n',  l:'chrome', t:'New incognito window', n:'', os:true },
+    { c:'ctrl+l',        l:'chrome', t:'Focus the address bar', n:'Alt+D and F6 do the same' },
+    { c:'ctrl+r',        l:'chrome', t:'Reload', n:'' },
+    { c:'ctrl+shift+r',  l:'chrome', t:'Reload, ignoring cache', n:'' },
+    { c:'ctrl+d',        l:'chrome', t:'Bookmark this page', n:'' },
+    { c:'ctrl+shift+o',  l:'chrome', t:'Bookmark manager', n:'' },
+    { c:'ctrl+h',        l:'chrome', t:'History', n:'' },
+    { c:'ctrl+j',        l:'chrome', t:'Downloads', n:'' },
+    { c:'ctrl+shift+i',  l:'chrome', t:'Developer tools', n:'F12 does the same' },
+    { c:'ctrl+shift+delete', l:'chrome', t:'Clear browsing data', n:'' },
+    { c:'ctrl+tab',      l:'chrome', t:'Next tab', n:'' },
+    { c:'alt+left',      l:'chrome', t:'Back', n:'' },
+    { c:'alt+right',     l:'chrome', t:'Forward', n:'' },
+
+    // ---- Excel ----
+    { c:'ctrl+1',        l:'excel', t:'Format cells', n:'' },
+    { c:'f2',            l:'excel', t:'Edit the active cell', n:'' },
+    { c:'f4',            l:'excel', t:'Repeat last action / cycle $ references', n:'' },
+    { c:'alt+=',         l:'excel', t:'AutoSum', n:'' },
+    { c:'ctrl+shift+l',  l:'excel', t:'Toggle filters', n:'' },
+    { c:'ctrl+t',        l:'excel', t:'Create a table', n:'' },
+    { c:'ctrl+enter',    l:'excel', t:'Fill the whole selection', n:'' },
+    { c:'ctrl+;',        l:'excel', t:"Insert today's date", n:'' },
+    { c:'ctrl+shift+;',  l:'excel', t:'Insert the current time', n:'' },
+    { c:'ctrl+pagedown', l:'excel', t:'Next worksheet', n:'' },
+    { c:'ctrl+pageup',   l:'excel', t:'Previous worksheet', n:'' },
+    { c:'shift+f11',     l:'excel', t:'Insert a worksheet', n:'' },
+    { c:'alt+f11',       l:'excel', t:'Open the VBA editor', n:'' },
+    { c:'f9',            l:'excel', t:'Recalculate all workbooks', n:'' },
+    { c:'ctrl+shift+down', l:'excel', t:'Select down to the edge of the data', n:'' },
+    { c:'ctrl+shift+right', l:'excel', t:'Select across to the edge of the data', n:'' }
   ];
 
   var CUSTOM = [];   // loaded from keybindings.json
@@ -1764,6 +1827,20 @@
     indexAll(); paintKeyboard(); renderTable(); refreshFilterCounts();
   }).catch(function(){});
 
+  // The user's customised Obsidian hotkeys. Obsidian stores overrides only,
+  // so anything left at its factory binding is covered by the table above.
+  api('/api/obsidian').then(function (o) {
+    if (!o || !o.shortcuts || !o.shortcuts.length) return;
+    o.shortcuts.forEach(function (s) {
+      CUSTOM.push({
+        c: s.combo.split(' ').map(normalise).join(' '),
+        l: 'obsidian', t: s.action, mine: true,
+        n: 'your Obsidian binding · ' + s.command
+      });
+    });
+    indexAll(); paintKeyboard(); renderTable(); refreshFilterCounts();
+  }).catch(function () {});
+
   // Live PowerToys hotkeys, read from the user's own settings. Modules they have
   // switched off are left out by the server — a disabled module presses nothing.
   api('/api/powertoys').then(function(r){ return r.ok ? r.json() : null; }).then(function (pt) {
@@ -1776,7 +1853,9 @@
         l: 'powertoys',
         t: s.module + (s.action && s.action !== 'Activate' ? ' — ' + s.action : ''),
         n: 'PowerToys grabs this system-wide before any app sees it',
-        os: true
+        os: true,
+        // carried so the conflict resolver can rebind this exact setting
+        ptModule: s.module, ptProp: s.prop, ptDefault: s.default
       });
     });
     indexAll(); paintKeyboard(); renderTable(); refreshFilterCounts();
