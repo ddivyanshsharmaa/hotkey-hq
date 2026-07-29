@@ -5,3 +5,6 @@ __pycache__/
 
 # Written at runtime and contains local paths.
 hotkey-hq.log
+
+# Snapshots of your keybinding files - local safety net, not source.
+snapshots/

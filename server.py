@@ -5,10 +5,14 @@ single-page interface, and reads the keyboard configuration of whoever is runnin
 it: their Claude Code keybindings, their VS Code keybindings, their PowerToys
 hotkeys and their Windows Terminal bindings.
 
-The only files it ever writes are the Claude Code and VS Code keybinding files,
-and only when the user clicks Assign or Remove.
+It writes only when the user asks: the Claude Code and VS Code keybinding files
+on Assign or Remove, a PowerToys hotkey when they resolve a conflict, and a
+cheat sheet into their Obsidian vault on export. Every one of those takes a
+backup first, and a snapshot of all keybinding files is kept in ./snapshots so
+any change can be rolled back.
 """
 import ctypes
+import datetime
 import json
 import re
 import secrets
@@ -393,6 +397,217 @@ def read_terminal():
 
 # ------------------------------------------------------------------ HTTP ----
 
+# ------------------------------------------------- snapshots and history ----
+
+SNAP_DIR = ROOT / "snapshots"
+
+
+def _tracked_files():
+    """Every keybinding file this machine has, as {label: Path}."""
+    files = {
+        "claude": KEYBINDINGS_PATH,
+        "vscode": VSCODE_KEYBINDINGS,
+    }
+    for p in WT_SETTINGS:
+        if p.is_file():
+            files["terminal"] = p
+            break
+    vaults = obsidian_vaults()
+    if vaults:
+        files["obsidian"] = Path(vaults[0]["path"]) / ".obsidian" / "hotkeys.json"
+    if POWERTOYS_DIR.is_dir():
+        for f in sorted(POWERTOYS_DIR.glob("*/settings.json")):
+            files["powertoys/" + f.parent.name] = f
+    return {k: v for k, v in files.items() if v and v.is_file()}
+
+
+def take_snapshot(reason="manual"):
+    """Copy every keybinding file into a timestamped folder. Skips writing a new
+    one when nothing has changed, so the history stays meaningful."""
+    files = _tracked_files()
+    if not files:
+        return None, "no keybinding files found to snapshot"
+
+    payload = {}
+    for label, path in files.items():
+        try:
+            payload[label] = path.read_text(encoding="utf-8-sig")
+        except Exception:
+            continue
+
+    previous = latest_snapshot()
+    if previous and previous.get("files") == payload:
+        return previous, "no change since the last snapshot"
+
+    stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    SNAP_DIR.mkdir(parents=True, exist_ok=True)
+    snap = {"id": stamp, "taken": stamp, "reason": reason,
+            "paths": {k: str(v) for k, v in files.items()}, "files": payload}
+    (SNAP_DIR / (stamp + ".json")).write_text(json.dumps(snap, indent=1), encoding="utf-8")
+    log("snapshot %s (%s), %d files" % (stamp, reason, len(payload)))
+    return snap, str(SNAP_DIR / (stamp + ".json"))
+
+
+def list_snapshots():
+    if not SNAP_DIR.is_dir():
+        return []
+    out = []
+    for f in sorted(SNAP_DIR.glob("*.json"), reverse=True):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+            out.append({"id": d.get("id", f.stem), "taken": d.get("taken"),
+                        "reason": d.get("reason", ""), "files": sorted(d.get("files", {}).keys())})
+        except Exception:
+            continue
+    return out
+
+
+def load_snapshot(snap_id):
+    f = SNAP_DIR / (str(snap_id) + ".json")
+    if not f.is_file():
+        return None
+    try:
+        return json.loads(f.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def latest_snapshot():
+    snaps = sorted(SNAP_DIR.glob("*.json"), reverse=True) if SNAP_DIR.is_dir() else []
+    if not snaps:
+        return None
+    try:
+        return json.loads(snaps[0].read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def restore_snapshot(snap_id, which=None):
+    """Put files back as they were. Takes a snapshot of the current state first,
+    so restoring is itself undoable."""
+    snap = load_snapshot(snap_id)
+    if not snap:
+        return False, "snapshot %r not found" % snap_id
+    take_snapshot("before restoring " + str(snap_id))
+
+    restored, failed = [], []
+    for label, text in (snap.get("files") or {}).items():
+        if which and label != which:
+            continue
+        path = Path((snap.get("paths") or {}).get(label, ""))
+        if not str(path):
+            failed.append(label)
+            continue
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+            restored.append(label)
+        except Exception as e:
+            failed.append("%s (%s)" % (label, e))
+    log("restored %s from %s" % (", ".join(restored) or "nothing", snap_id))
+    return (not failed), {"restored": restored, "failed": failed}
+
+
+def _hotkey_map():
+    """Flatten every source into {combo: 'where — what'} so two points in time
+    can be compared by meaning rather than by raw file text."""
+    out = {}
+    try:
+        rows, _ = read_powertoys()
+        for r in rows:
+            out["PowerToys " + r["combo"]] = "%s — %s" % (r["module"], r.get("action", ""))
+    except Exception:
+        pass
+    try:
+        for b in read_vscode():
+            if isinstance(b, dict) and b.get("key"):
+                out["VS Code " + str(b["key"])] = str(b.get("command", ""))
+    except Exception:
+        pass
+    try:
+        cfg = _read_jsonc(KEYBINDINGS_PATH) or {}
+        for block in cfg.get("bindings", []) or []:
+            for k, v in (block.get("bindings") or {}).items():
+                out["Claude Code " + k] = "%s (%s)" % (v, block.get("context", ""))
+    except Exception:
+        pass
+    try:
+        rows, _v = read_obsidian()
+        for r in rows:
+            out["Obsidian " + r["combo"]] = r.get("action", "")
+    except Exception:
+        pass
+    return out
+
+
+def history():
+    """What changed between consecutive snapshots, in shortcut terms."""
+    snaps = sorted(SNAP_DIR.glob("*.json")) if SNAP_DIR.is_dir() else []
+    entries = []
+    for f in snaps:
+        try:
+            entries.append(json.loads(f.read_text(encoding="utf-8")))
+        except Exception:
+            continue
+    if len(entries) < 2:
+        return []
+
+    def flatten(snap):
+        """Rebuild the shortcut map from a snapshot's stored file text."""
+        m = {}
+        for label, text in (snap.get("files") or {}).items():
+            try:
+                data = json.loads(_strip_jsonc(text) or "{}")
+            except Exception:
+                continue
+            if label.startswith("powertoys/"):
+                module = label.split("/", 1)[1]
+                props = data.get("properties", data)
+                if isinstance(props, dict):
+                    for name, node in props.items():
+                        inner = node.get("value") if isinstance(node, dict) and "value" in node else node
+                        c = _combo(inner)
+                        if c and not name.startswith("Default"):
+                            m["PowerToys %s/%s" % (module, name)] = c
+            elif label == "vscode" and isinstance(data, list):
+                for b in data:
+                    if isinstance(b, dict) and b.get("key"):
+                        m["VS Code " + str(b.get("command", "?"))] = str(b["key"])
+            elif label == "claude" and isinstance(data, dict):
+                for block in data.get("bindings", []) or []:
+                    for k, v in (block.get("bindings") or {}).items():
+                        m["Claude Code " + str(v)] = k
+            elif label == "obsidian" and isinstance(data, dict):
+                for cmd, binds in data.items():
+                    if isinstance(binds, list) and binds:
+                        b = binds[0]
+                        mods = [OBS_MOD.get(str(x).lower()) for x in (b.get("modifiers") or [])]
+                        mods = [x for x in mods if x]
+                        order = [x for x in ("ctrl", "alt", "shift", "win") if x in mods]
+                        if b.get("key"):
+                            m["Obsidian " + cmd] = "+".join(order + [str(b["key"]).lower()])
+        return m
+
+    out = []
+    for older, newer in zip(entries, entries[1:]):
+        a, b = flatten(older), flatten(newer)
+        changes = []
+        for k in sorted(set(a) | set(b)):
+            if a.get(k) == b.get(k):
+                continue
+            if k not in a:
+                changes.append({"what": k, "kind": "added", "to": b[k]})
+            elif k not in b:
+                changes.append({"what": k, "kind": "removed", "from": a[k]})
+            else:
+                changes.append({"what": k, "kind": "moved", "from": a[k], "to": b[k]})
+        if changes:
+            out.append({"at": newer.get("taken"), "reason": newer.get("reason", ""),
+                        "changes": changes})
+    out.reverse()
+    return out
+
+
 # ------------------------------------------------------------- Obsidian ----
 
 def obsidian_vaults():
@@ -575,6 +790,18 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(200, {"installed": False, "shortcuts": [], "skipped": 0,
                                       "error": str(e)})
 
+        elif self.path == "/api/snapshots":
+            self._send_json(200, {"snapshots": list_snapshots()})
+            return
+
+        elif self.path == "/api/history":
+            try:
+                self._send_json(200, {"history": history()})
+            except Exception as e:
+                log("history failed: %s" % e)
+                self._send_json(200, {"history": [], "error": str(e)})
+            return
+
         elif self.path == "/api/obsidian":
             try:
                 rows, vault = read_obsidian()
@@ -600,7 +827,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path not in ("/api/assign", "/api/unassign",
                              "/api/powertoys/rebind", "/api/powertoys/restart",
-                             "/api/export/obsidian"):
+                             "/api/export/obsidian",
+                             "/api/snapshot", "/api/restore"):
             self.send_response(404); self.end_headers(); return
         if not self._authorised():
             return
@@ -614,6 +842,26 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(413, {"ok": False, "error": "request too large"})
             return
         raw = self.rfile.read(length) if length else b"{}"
+
+        # ---- backup and restore ----
+        if self.path == "/api/snapshot":
+            snap, msg = take_snapshot("manual")
+            self._send_json(200, {"ok": snap is not None, "message": msg,
+                                  "id": snap.get("id") if snap else None})
+            return
+
+        if self.path == "/api/restore":
+            try:
+                d = json.loads(raw)
+                ok, detail = restore_snapshot(d["id"], d.get("which"))
+            except Exception as e:
+                self._send_json(400, {"ok": False, "error": "bad request: %s" % e})
+                return
+            self._send_json(200 if ok else 500,
+                            {"ok": ok, "detail": detail,
+                             "note": "A snapshot of the previous state was taken first, "
+                                     "so this restore can itself be undone."})
+            return
 
         # ---- PowerToys conflict resolver ----
         if self.path == "/api/powertoys/restart":
@@ -835,6 +1083,13 @@ def main():
     if httpd is not None:
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         log("serving %s on port %d" % (ROOT, port))
+        # Snapshot on every launch so a history builds up without being asked.
+        # take_snapshot() is a no-op when nothing has changed, so this stays
+        # cheap and the timeline only shows real edits.
+        try:
+            take_snapshot("app launched")
+        except Exception as e:
+            log("startup snapshot failed: %s" % e)
 
     try:
         import webview

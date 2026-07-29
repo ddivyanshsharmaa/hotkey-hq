@@ -45,6 +45,8 @@
     --L-obsidian: #6b3fa0;
     --L-chrome:   #1a7f37;
     --L-excel:    #8a5a00;
+    --L-nvidia:   #4d7c0f;
+    --L-notion:   #55606b;
     --lit-ink:    #ffffff;
 
     --shadow-key: 0 2px 0 var(--keycap-edge);
@@ -57,7 +59,7 @@
       --line-soft:#2a2e32; --keycap:#2b2f34; --keycap-mod:#1f2327; --keycap-edge:#121417;
       --ink:#e9ebe6; --ink-soft:#b0b5ac; --ink-faint:#7b8179; --code-bg:#0e1013; --code-ink:#e4e7de;
       --L-claude:#f0906b; --L-vscode:#6fb7e8; --L-windows:#4ecab8; --L-text:#a89e90;
-      --L-shell:#b49ae8; --L-custom:#c9c15e; --L-powertoys:#f08cc0; --lit-ink:#15171a; --L-obsidian:#b99ae8; --L-chrome:#68d391; --L-excel:#e0b357;
+      --L-shell:#b49ae8; --L-custom:#c9c15e; --L-powertoys:#f08cc0; --lit-ink:#15171a; --L-obsidian:#b99ae8; --L-chrome:#68d391; --L-excel:#e0b357; --L-nvidia:#a3d264; --L-notion:#9aa6b2;
       --shadow-key: 0 2px 0 var(--keycap-edge);
       --shadow-panel: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
     }
@@ -67,7 +69,7 @@
     --line-soft:#2a2e32; --keycap:#2b2f34; --keycap-mod:#1f2327; --keycap-edge:#121417;
     --ink:#e9ebe6; --ink-soft:#b0b5ac; --ink-faint:#7b8179; --code-bg:#0e1013; --code-ink:#e4e7de;
     --L-claude:#f0906b; --L-vscode:#6fb7e8; --L-windows:#4ecab8; --L-text:#a89e90;
-    --L-shell:#b49ae8; --L-custom:#c9c15e; --L-powertoys:#f08cc0; --lit-ink:#15171a; --L-obsidian:#b99ae8; --L-chrome:#68d391; --L-excel:#e0b357;
+    --L-shell:#b49ae8; --L-custom:#c9c15e; --L-powertoys:#f08cc0; --lit-ink:#15171a; --L-obsidian:#b99ae8; --L-chrome:#68d391; --L-excel:#e0b357; --L-nvidia:#a3d264; --L-notion:#9aa6b2;
     --shadow-key: 0 2px 0 var(--keycap-edge);
     --shadow-panel: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
   }
@@ -191,6 +193,8 @@
   .lchip[data-l="obsidian"]{ background:var(--L-obsidian); }
   .lchip[data-l="chrome"]  { background:var(--L-chrome); }
   .lchip[data-l="excel"]   { background:var(--L-excel); }
+  .lchip[data-l="nvidia"]  { background:var(--L-nvidia); }
+  .lchip[data-l="notion"]  { background:var(--L-notion); }
   :root[data-theme="dark"] .lchip, :root:not([data-theme]) .lchip { color:#15171a; }
   @media (prefers-color-scheme: light) { :root:not([data-theme]) .lchip { color:#fff; } }
   :root[data-theme="light"] .lchip { color:#fff; }
@@ -276,6 +280,8 @@
   .kdot[data-l="obsidian"] { background:var(--L-obsidian); }
   .kdot[data-l="chrome"]   { background:var(--L-chrome); }
   .kdot[data-l="excel"]    { background:var(--L-excel); }
+  .kdot[data-l="nvidia"]   { background:var(--L-nvidia); }
+  .kdot[data-l="notion"]   { background:var(--L-notion); }
   .kcount { margin-left:auto; font-family:var(--mono); font-size:8.5px; line-height:1; color:var(--ink-faint); }
 
   .key[data-key] { cursor:pointer; }
@@ -362,6 +368,9 @@
     </div>
     <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
       <button class="btn capture-on" id="captureBtn" type="button" aria-pressed="true">● Capture: on</button>
+      <button class="btn" id="practiceBtn" type="button">Practice</button>
+      <button class="btn" id="historyBtn" type="button">History</button>
+      <button class="btn" id="backupBtn" type="button">Backups</button>
       <button class="btn" id="exportBtn" type="button">Export to Obsidian</button>
       <button class="btn" id="freeBtn" type="button">Find a free combo</button>
       <button class="btn" id="addBtn" type="button">+ Add binding</button>
@@ -459,17 +468,19 @@
   /* ============ layers ============ */
   var LAYERS = {
     powertoys:{ name:'PowerToys',   rank: -1 },  // global hook — beats everything
+    nvidia:  { name: 'NVIDIA',      rank: -1 },  // overlay hooks globally, same as PowerToys
     windows: { name: 'Windows',     rank: 0 },
     claude:  { name: 'Claude Code', rank: 1 },
     custom:  { name: 'Yours',       rank: 1 },
     shell:   { name: 'Terminal',    rank: 2 },
     vscode:  { name: 'VS Code',     rank: 3 },
     obsidian:{ name: 'Obsidian',    rank: 3 },
-    chrome:  { name: 'Chrome',      rank: 3 },
+    chrome:  { name: 'Chromium',    rank: 3 },  // Chrome, Edge and Brave share these
+    notion:  { name: 'Notion',      rank: 3 },
     excel:   { name: 'Excel',       rank: 3 },
     text:    { name: 'Text edit',   rank: 4 }
   };
-  var LAYER_ORDER = ['claude','custom','powertoys','vscode','obsidian','chrome','excel','windows','shell','text'];
+  var LAYER_ORDER = ['claude','custom','powertoys','nvidia','vscode','obsidian','notion','chrome','excel','windows','shell','text'];
 
   /* ============ shortcut data ============
      combo: space-separated steps for chords. os:true => OS eats it, page can't capture. */
@@ -671,7 +682,31 @@
     { c:'alt+f11',       l:'excel', t:'Open the VBA editor', n:'' },
     { c:'f9',            l:'excel', t:'Recalculate all workbooks', n:'' },
     { c:'ctrl+shift+down', l:'excel', t:'Select down to the edge of the data', n:'' },
-    { c:'ctrl+shift+right', l:'excel', t:'Select across to the edge of the data', n:'' }
+    { c:'ctrl+shift+right', l:'excel', t:'Select across to the edge of the data', n:'' },
+
+    // ---- NVIDIA overlay. These hook globally like PowerToys, so they beat the
+    //      focused app and this page cannot capture them either. ----
+    { c:'alt+z',         l:'nvidia', t:'Open the NVIDIA overlay', n:'Steals plain Alt+Z from every application', os:true },
+    { c:'alt+f1',        l:'nvidia', t:'Take a screenshot', n:'', os:true },
+    { c:'alt+f2',        l:'nvidia', t:'Photo mode', n:'', os:true },
+    { c:'alt+f3',        l:'nvidia', t:'Game filters', n:'', os:true },
+    { c:'alt+f9',        l:'nvidia', t:'Start / stop recording', n:'', os:true },
+    { c:'alt+f10',       l:'nvidia', t:'Save instant replay', n:'', os:true },
+    { c:'alt+shift+f10', l:'nvidia', t:'Toggle instant replay', n:'', os:true },
+    { c:'alt+f12',       l:'nvidia', t:'Toggle the FPS counter', n:'', os:true },
+    { c:'alt+r',         l:'nvidia', t:'Performance overlay', n:'', os:true },
+    { c:'alt+b',         l:'nvidia', t:'Start / stop broadcast', n:'', os:true },
+
+    // ---- Notion desktop ----
+    { c:'ctrl+p',        l:'notion', t:'Quick find', n:'' },
+    { c:'ctrl+n',        l:'notion', t:'New page', n:'' },
+    { c:'ctrl+shift+n',  l:'notion', t:'New window', n:'', os:true },
+    { c:'ctrl+[',        l:'notion', t:'Back', n:'' },
+    { c:'ctrl+]',        l:'notion', t:'Forward', n:'' },
+    { c:'ctrl+shift+l',  l:'notion', t:'Toggle dark mode', n:'' },
+    { c:'ctrl+e',        l:'notion', t:'Inline code', n:'' },
+    { c:'ctrl+shift+m',  l:'notion', t:'Add a comment', n:'' },
+    { c:'ctrl+shift+u',  l:'notion', t:'Go up to the parent page', n:'' }
   ];
 
   var CUSTOM = [];   // loaded from keybindings.json
@@ -1509,6 +1544,49 @@
 
     if (act === 'rebind') { showRebind(b.getAttribute('data-combo'), lookup(b.getAttribute('data-combo'))); return; }
 
+    if (act === 'answer') {
+      if (!practice) return;
+      var chosen = b.getAttribute('data-t');
+      var correct = chosen === practice.answer.t;
+      var key = practice.answer.l + '|' + practice.answer.c;
+      var s = practiceScore();
+      s[key] = s[key] || { right: 0, wrong: 0 };
+      s[key][correct ? 'right' : 'wrong']++;
+      savePracticeScore(s);
+      showPractice({ correct: correct, t: practice.answer.t,
+                     combo: prettyCombo(practice.answer.c.split(' ').map(normalise).join(' ')) });
+      return;
+    }
+
+    if (act === 'snapnow') {
+      b.disabled = true; b.textContent = 'Backing up…';
+      api('/api/snapshot', { method: 'POST', body: '{}' })
+        .then(function (r) { return r.json(); })
+        .then(function () { showBackups(); })
+        .catch(function () { b.disabled = false; b.textContent = 'Back up now'; });
+      return;
+    }
+
+    if (act === 'restore') {
+      var id = b.getAttribute('data-id');
+      if (!window.confirm('Restore every keybinding file to how it was at ' + id +
+                          '?\n\nA backup of the current state is taken first, so this can be undone.')) return;
+      b.disabled = true; b.textContent = 'Restoring…';
+      api('/api/restore', { method: 'POST', body: JSON.stringify({ id: id }) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          tone(d.ok ? 'custom' : 'none');
+          ro.innerHTML = '<p class="ro-combo">' + (d.ok ? 'Restored' : 'Restore failed') + '</p>' +
+            '<p class="ro-sub">' + esc(d.ok
+              ? 'Put back: ' + ((d.detail && d.detail.restored) || []).join(', ') +
+                '. Reload the app to see it, and restart PowerToys if any of its hotkeys changed.'
+              : JSON.stringify(d.detail || d.error)) + '</p>' +
+            '<div class="ro-actions"><button class="btn" data-act="idle">Close</button></div>';
+        })
+        .catch(function () { b.disabled = false; b.textContent = 'Restore'; });
+      return;
+    }
+
     if (act === 'pickfree') {
       var fc = b.getAttribute('data-combo');
       tone('custom');
@@ -1735,6 +1813,147 @@
     });
   });
 
+  /* ---- change history ---- */
+  document.getElementById('historyBtn').addEventListener('click', function () {
+    this.blur();
+    tone('custom');
+    ro.innerHTML = '<p class="ro-combo">History</p><p class="ro-sub">Reading snapshots…</p>';
+    api('/api/history').then(function (r) { return r.json(); }).then(function (d) {
+      var h = d.history || [];
+      if (!h.length) {
+        ro.innerHTML = '<p class="ro-combo">History</p>' +
+          '<p class="ro-sub">Nothing has changed yet. A snapshot is taken every time the app starts, ' +
+          'so once a shortcut moves it will show up here with the date it happened.</p>' +
+          '<div class="ro-actions"><button class="btn" data-act="idle">Close</button></div>';
+        return;
+      }
+      var html = '<p class="ro-combo">History</p>' +
+        '<p class="ro-sub">' + h.length + ' change' + (h.length===1?'':'s') + ' recorded since the app started tracking</p><div class="kv">';
+      h.forEach(function (e) {
+        html += '<div class="kv-row"><div class="kv-combo">' + esc(String(e.at).replace('_',' ').replace(/-/g,':').replace(/^(\d+):(\d+):(\d+)/,'$1-$2-$3')) + '</div><div class="kv-claims">';
+        e.changes.forEach(function (c) {
+          var detail = c.kind === 'moved' ? pretty(c.from) + ' → ' + pretty(c.to)
+                     : c.kind === 'added' ? 'now on ' + pretty(c.to)
+                     : 'was ' + pretty(c.from);
+          html += '<div class="kv-claim"><span class="lchip" data-l="custom">' + esc(c.kind) + '</span>' +
+                  '<span class="body"><span class="what">' + esc(c.what) + '</span>' +
+                  '<span class="why">' + esc(detail) + '</span></span></div>';
+        });
+        html += '</div></div>';
+      });
+      html += '</div><div class="ro-actions"><button class="btn" data-act="idle">Close</button></div>';
+      ro.innerHTML = html;
+    }).catch(function () {
+      ro.innerHTML = '<p class="ro-combo">History</p><p class="ro-sub">Could not reach the local helper.</p>' +
+        '<div class="ro-actions"><button class="btn" data-act="idle">Close</button></div>';
+    });
+  });
+
+  /* ---- backups ---- */
+  function showBackups() {
+    api('/api/snapshots').then(function (r) { return r.json(); }).then(function (d) {
+      var s = d.snapshots || [];
+      var html = '<p class="ro-combo">Backups</p>' +
+        '<p class="ro-sub">Every keybinding file on this machine — Claude Code, VS Code, PowerToys, ' +
+        'Windows Terminal and Obsidian — copied together. Restoring takes a snapshot of the current ' +
+        'state first, so it is itself undoable.</p>' +
+        '<div class="ro-actions"><button class="btn primary" data-act="snapnow">Back up now</button>' +
+        '<button class="btn" data-act="idle">Close</button></div>';
+      if (s.length) {
+        html += '<div class="kv">';
+        s.slice(0, 12).forEach(function (row) {
+          html += '<div class="kv-row"><div class="kv-combo">' + esc(String(row.id).replace('_', ' ')) + '</div>' +
+            '<div class="kv-claims"><div class="kv-claim"><span class="body">' +
+            '<span class="what">' + esc(row.reason || 'snapshot') + '</span>' +
+            '<span class="why">' + (row.files || []).length + ' files</span></span>' +
+            '<button class="btn" data-act="restore" data-id="' + esc(row.id) + '" ' +
+            'style="padding:3px 9px;font-size:11.5px;">Restore</button></div></div></div>';
+        });
+        html += '</div>';
+      }
+      tone('custom');
+      ro.innerHTML = html;
+    }).catch(function () {
+      tone('none');
+      ro.innerHTML = '<p class="ro-combo">Backups</p><p class="ro-sub">Could not reach the local helper.</p>' +
+        '<div class="ro-actions"><button class="btn" data-act="idle">Close</button></div>';
+    });
+  }
+  document.getElementById('backupBtn').addEventListener('click', function () { this.blur(); showBackups(); });
+
+  /* ---- practice ---- */
+  var practice = null;
+  function practiceScore() {
+    try { return JSON.parse(store('hotkeyhq-practice') || '{}') || {}; } catch (e) { return {}; }
+  }
+  function savePracticeScore(s) { store('hotkeyhq-practice', JSON.stringify(s)); }
+
+  function nextQuestion() {
+    // Only ask about things that actually fire: no OS-level rows, and only the
+    // layers currently switched on.
+    var pool = DATA.concat(CUSTOM).filter(function (e) {
+      return !e.os && active[e.l] && e.t && e.c.indexOf(' ') < 0;
+    });
+    if (pool.length < 4) return null;
+
+    var score = practiceScore();
+    // Weight toward combos previously answered wrong.
+    var weighted = [];
+    pool.forEach(function (e) {
+      var k = e.l + '|' + e.c;
+      var wrong = (score[k] && score[k].wrong) || 0;
+      var reps = 1 + Math.min(wrong, 4) * 2;
+      for (var i = 0; i < reps; i++) weighted.push(e);
+    });
+    var answer = weighted[Math.floor(Math.random() * weighted.length)];
+
+    var wrongs = pool.filter(function (e) { return e.t !== answer.t; });
+    var opts = [answer];
+    while (opts.length < 4 && wrongs.length) {
+      var pick = wrongs.splice(Math.floor(Math.random() * wrongs.length), 1)[0];
+      if (!opts.some(function (o) { return o.t === pick.t; })) opts.push(pick);
+    }
+    for (var i = opts.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = opts[i]; opts[i] = opts[j]; opts[j] = t;
+    }
+    return { answer: answer, options: opts };
+  }
+
+  function showPractice(result) {
+    var q = nextQuestion();
+    if (!q) {
+      tone('none');
+      ro.innerHTML = '<p class="ro-combo">Practice</p>' +
+        '<p class="ro-sub">Not enough shortcuts in the layers you have switched on. Enable a few more above.</p>' +
+        '<div class="ro-actions"><button class="btn" data-act="idle">Close</button></div>';
+      return;
+    }
+    practice = q;
+    var s = practiceScore();
+    var right = 0, asked = 0;
+    Object.keys(s).forEach(function (k) { right += s[k].right || 0; asked += (s[k].right || 0) + (s[k].wrong || 0); });
+
+    tone('claude');
+    var banner = '';
+    if (result) {
+      banner = result.correct
+        ? '<p class="ro-sub" style="color:var(--L-chrome)">Correct — ' + esc(result.combo) + ' is ' + esc(result.t) + '</p>'
+        : '<p class="ro-sub" style="color:var(--L-powertoys)">Not quite — ' + esc(result.combo) + ' is <strong>' + esc(result.t) + '</strong></p>';
+    }
+    ro.innerHTML =
+      '<p class="ro-combo">' + esc(prettyCombo(q.answer.c.split(' ').map(normalise).join(' '))) + '</p>' +
+      banner +
+      '<p class="ro-sub">What does this do in <strong>' + esc(LAYERS[q.answer.l].name) + '</strong>?' +
+      (asked ? '  ·  ' + right + '/' + asked + ' right so far' : '') + '</p>' +
+      '<div class="ro-actions" style="flex-direction:column;align-items:stretch;gap:6px;">' +
+      q.options.map(function (o) {
+        return '<button class="btn" data-act="answer" data-t="' + esc(o.t) + '" style="text-align:left;">' + esc(o.t) + '</button>';
+      }).join('') +
+      '</div><div class="ro-actions"><button class="btn" data-act="idle">Stop</button></div>';
+  }
+  document.getElementById('practiceBtn').addEventListener('click', function () { this.blur(); showPractice(null); });
+
   document.getElementById('addBtn').addEventListener('click', function () {
     addMode = true; endPending(); clearFlash(); tone('custom');
     ro.innerHTML = '<p class="ro-combo">Listening…</p><p class="ro-sub">Press the combo you want to bind in Claude Code.</p>' +
@@ -1943,22 +2162,25 @@
     flagPowerToysClashes();
   }).catch(function(){});
 
-  // Surface combos where PowerToys silently shadows an app shortcut.
+  // Anything that installs a system-wide hook beats the focused app, so a
+  // clash with one of these is invisible until something quietly stops working.
+  var GLOBAL_LAYERS = ['powertoys', 'nvidia'];
+
   function flagPowerToysClashes() {
     var clashes = [];
     Object.keys(INDEX).forEach(function (combo) {
       var hits = INDEX[combo];
-      var pt = hits.filter(function(h){ return h.l === 'powertoys'; });
-      var others = hits.filter(function(h){ return h.l !== 'powertoys' && h.l !== 'windows'; });
+      var pt = hits.filter(function(h){ return GLOBAL_LAYERS.indexOf(h.l) >= 0; });
+      var others = hits.filter(function(h){ return GLOBAL_LAYERS.indexOf(h.l) < 0 && h.l !== 'windows'; });
       if (pt.length && others.length) clashes.push({ combo: combo, pt: pt[0], others: others });
     });
     if (!clashes.length) return;
     var box = document.getElementById('ptClash');
     box.style.display = 'block';
-    box.innerHTML = '<h3>' + clashes.length + ' PowerToys shortcut' + (clashes.length===1?'':'s') +
+    box.innerHTML = '<h3>' + clashes.length + ' global shortcut' + (clashes.length===1?'':'s') +
       ' shadowing something else on this machine</h3>' +
-      '<p style="margin:0 0 9px; font-size:13.5px; color:var(--ink-soft);">PowerToys uses a system-wide keyboard hook, so it fires first and the app binding below it never runs. Rebind in PowerToys Settings if you want the app one back.' +
-      (ptSkipped ? ' Modules you have switched off are not counted — ' + ptSkipped + ' of them were skipped.' : '') + '</p>' +
+      '<p style="margin:0 0 9px; font-size:13.5px; color:var(--ink-soft);">PowerToys and the NVIDIA overlay both install system-wide keyboard hooks, so they fire first and the app binding underneath never runs.' +
+      (ptSkipped ? ' PowerToys modules you have switched off are not counted — ' + ptSkipped + ' of them were skipped.' : '') + '</p>' +
       '<ul>' + clashes.map(function (c) {
         var fix = '';
         if (c.pt.ptModule && c.pt.ptProp) {
@@ -1968,6 +2190,9 @@
               ' data-prop="' + esc(c.pt.ptProp) + '" data-combo="' + esc(target) + '"' +
               ' style="margin-left:6px;padding:3px 9px;font-size:11.5px;">Move it to ' + esc(pretty(target)) + '</button>'
             : ' <span class="kv-beaten" style="margin-left:6px;">no vendor default to fall back to — rebind it in PowerToys Settings</span>';
+        } else if (c.pt.l === 'nvidia') {
+          // NVIDIA keeps its bindings in its own service, not a file we can edit.
+          fix = ' <span class="kv-beaten" style="margin-left:6px;">change it in NVIDIA App → Settings → Keyboard shortcuts</span>';
         }
         return '<li><code>' + esc(prettyCombo(c.combo)) + '</code> — <strong>' + esc(c.pt.t) + '</strong> wins over ' +
                esc(c.others.map(function(o){ return LAYERS[o.l].name + ': ' + o.t; }).join(', ')) + fix + '</li>';
