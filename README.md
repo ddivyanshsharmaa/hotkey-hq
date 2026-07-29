@@ -105,4 +105,17 @@ interface.
 | `setup.bat` | One-time environment setup |
 | `launch.bat` | Starts the app |
 | `icon.ico` | App icon |
+| `LICENSE` | MIT licence |
 | `hotkey-hq.log` | Written at runtime; startup failures land here |
+
+## Licence
+
+MIT — see [LICENSE](LICENSE). Use it, fork it, ship it, sell it; just keep the
+copyright notice.
+
+The single dependency, [pywebview](https://pywebview.flowrl.com/), is BSD-3 and
+is installed into your own `.venv` rather than bundled here.
+
+The shortcut *defaults* tables are a hand-compiled reference to what Windows,
+VS Code, Claude Code, PowerToys and the rest ship with. Those product names
+belong to their owners and appear here only to say whose shortcut is whose.
