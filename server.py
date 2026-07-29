@@ -14,8 +14,10 @@ import re
 import secrets
 import shutil
 import socket
+import subprocess
 import sys
 import threading
+import time
 import traceback
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -172,6 +174,79 @@ def _combo(node):
     return "+".join(order + [base])
 
 
+VK_REVERSE = {}
+for _code, _name in VK.items():
+    # '-' and '.' and '/' appear twice in VK (main row and numpad); the main-row
+    # code wins because that is what a user means by "minus".
+    if _name not in VK_REVERSE or _code < VK_REVERSE[_name]:
+        VK_REVERSE[_name] = _code
+
+
+def _node_from_combo(combo):
+    """Turn 'win+shift+c' back into the shape PowerToys stores on disk.
+    Returns None if any part of it has no virtual-key code."""
+    parts = [p.strip().lower() for p in str(combo).split("+") if p.strip()]
+    if not parts:
+        return None
+    base = parts[-1]
+    mods = set(parts[:-1])
+    if not set(mods).issubset({"ctrl", "alt", "shift", "win"}):
+        return None
+    code = VK_REVERSE.get(base)
+    if code is None:
+        return None
+    return {"win": "win" in mods, "ctrl": "ctrl" in mods,
+            "alt": "alt" in mods, "shift": "shift" in mods,
+            "code": code, "key": ""}
+
+
+def rebind_powertoys(module, prop, combo):
+    """Point one PowerToys hotkey at a new combination. Returns (ok, message)."""
+    target = POWERTOYS_DIR / module / "settings.json"
+    if not target.is_file():
+        return False, "no settings file for module %r" % module
+    node = _node_from_combo(combo)
+    if node is None:
+        return False, "PowerToys cannot express the combination %r" % combo
+    data = _read_jsonc(target)
+    if not isinstance(data, dict):
+        return False, "settings.json for %s is not readable JSON" % module
+    props = data.get("properties") if isinstance(data.get("properties"), dict) else data
+    if prop not in props:
+        return False, "module %s has no setting called %r" % (module, prop)
+
+    # Some hotkeys are stored bare, others wrapped in {"value": {...}}.
+    existing = props[prop]
+    if isinstance(existing, dict) and "value" in existing:
+        props[prop]["value"] = node
+    else:
+        props[prop] = node
+
+    backup = target.with_suffix(".json.hotkeyhq-backup")
+    if not backup.exists():
+        shutil.copy2(target, backup)
+    target.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    log("rebound PowerToys %s/%s to %s" % (module, prop, combo))
+    return True, str(target)
+
+
+def restart_powertoys():
+    """PowerToys reads most hotkeys at module start, so a file edit alone is not
+    reliably picked up. Returns (ok, message)."""
+    exe = HOME / "AppData" / "Local" / "PowerToys" / "PowerToys.exe"
+    if not exe.is_file():
+        return False, "PowerToys.exe not found at %s" % exe
+    try:
+        subprocess.run(["taskkill", "/F", "/IM", "PowerToys.exe", "/T"],
+                       capture_output=True, timeout=15)
+        time.sleep(1.5)
+        subprocess.Popen([str(exe)], cwd=str(exe.parent))
+        log("restarted PowerToys")
+        return True, "PowerToys restarted"
+    except Exception as e:
+        return False, str(e)
+
+
 def _norm_module(name):
     """'Shortcut Guide' and 'ShortcutGuide' are the same module — PowerToys uses
     both spellings, one as a folder name and one as an enabled-map key."""
@@ -213,8 +288,11 @@ def read_powertoys():
         if not isinstance(props, dict):
             continue
 
-        # Collect candidate shortcut nodes, preferring the user's binding over the default.
-        picked = {}
+        # Collect candidate shortcut nodes, preferring the user's binding over the
+        # default. Defaults are kept in their own map: both names reduce to the
+        # same label, so storing them together loses whichever arrives second —
+        # and the vendor default is what the conflict resolver offers as a fix.
+        picked, defaults = {}, {}
         for name, node in props.items():
             inner = node.get("value") if isinstance(node, dict) and "value" in node else node
             combo = _combo(inner)
@@ -223,11 +301,13 @@ def read_powertoys():
             is_default = name.startswith("Default")
             label = name.replace("Default", "").replace("_", " ").replace("-", " ").strip()
             key = label.lower()
-            if key in picked and is_default:
-                continue  # never let a Default overwrite a real binding
-            picked[key] = (combo, label, is_default)
+            if is_default:
+                defaults[key] = combo
+                if key in picked:
+                    continue          # a real binding already won this slot
+            picked[key] = (combo, label, is_default, name)
 
-        for combo, label, _is_default in picked.values():
+        for key, (combo, label, _is_default, prop) in picked.items():
             sig = (module, combo)
             if sig in seen:
                 continue
@@ -236,7 +316,17 @@ def read_powertoys():
             for junk in ("ActivationShortcut", "activation shortcut", "hotkey", "shortcut"):
                 nice = nice.replace(junk, "")
             nice = " ".join(nice.split()).strip() or "Activate"
-            out.append({"combo": combo, "module": module, "action": nice[:1].upper() + nice[1:]})
+            # `prop` and `default` let the conflict resolver rebind this exact
+            # setting, and offer the vendor default as the suggested new home.
+            # PowerToys reads the user-override slot, so strip a "Default"
+            # prefix when telling the resolver where to write.
+            write_prop = prop[len("Default"):] if prop.startswith("Default") else prop
+            entry = {"combo": combo, "module": module, "prop": write_prop,
+                     "action": nice[:1].upper() + nice[1:]}
+            dflt = defaults.get(key)
+            if dflt and dflt != combo:
+                entry["default"] = dflt
+            out.append(entry)
     return out, skipped
 
 
@@ -302,6 +392,84 @@ def read_terminal():
 
 
 # ------------------------------------------------------------------ HTTP ----
+
+# ------------------------------------------------------------- Obsidian ----
+
+def obsidian_vaults():
+    """Obsidian keeps a registry of every vault, so we never hardcode a path.
+    Most-recently-opened first."""
+    reg = _read_jsonc(HOME / "AppData" / "Roaming" / "obsidian" / "obsidian.json")
+    if not isinstance(reg, dict):
+        return []
+    vaults = reg.get("vaults")
+    if not isinstance(vaults, dict):
+        return []
+    rows = []
+    for v in vaults.values():
+        p = v.get("path")
+        if p and Path(p).is_dir():
+            rows.append({"path": p, "open": bool(v.get("open")), "ts": v.get("ts") or 0})
+    rows.sort(key=lambda r: (not r["open"], -r["ts"]))
+    return rows
+
+
+# Obsidian writes "Mod", which is Ctrl on Windows and Cmd on macOS.
+OBS_MOD = {"mod": "ctrl", "ctrl": "ctrl", "control": "ctrl",
+           "alt": "alt", "shift": "shift", "meta": "win"}
+
+
+def read_obsidian():
+    """The user's *customised* Obsidian hotkeys. Obsidian only stores overrides,
+    so anything left at its factory binding is covered by the defaults table in
+    the page instead."""
+    vaults = obsidian_vaults()
+    if not vaults:
+        return [], None
+    vault = vaults[0]["path"]
+    data = _read_jsonc(Path(vault) / ".obsidian" / "hotkeys.json")
+    if not isinstance(data, dict):
+        return [], vault
+    out = []
+    for command, binds in data.items():
+        if not isinstance(binds, list):
+            continue
+        for b in binds:
+            if not isinstance(b, dict) or not b.get("key"):
+                continue
+            mods = [OBS_MOD.get(str(m).lower()) for m in (b.get("modifiers") or [])]
+            mods = [m for m in mods if m]
+            order = [m for m in ("ctrl", "alt", "shift", "win") if m in mods]
+            key = str(b["key"]).lower()
+            nice = command.split(":")[-1].replace("-", " ").strip()
+            out.append({"combo": "+".join(order + [key]),
+                        "command": command,
+                        "action": (nice[:1].upper() + nice[1:]) or command})
+    return out, vault
+
+
+def export_obsidian(markdown):
+    """Write the cheat sheet into the user's vault. Returns (ok, message)."""
+    if not isinstance(markdown, str) or not markdown.strip():
+        return False, "nothing to write"
+    vaults = obsidian_vaults()
+    if not vaults:
+        return False, "no Obsidian vault found on this machine"
+    vault = Path(vaults[0]["path"])
+
+    # Respect a PARA layout if the vault uses one, otherwise drop it at the root.
+    folder = vault
+    for candidate in ("2 - Areas", "Areas", "3 - Resources", "Resources"):
+        if (vault / candidate).is_dir():
+            folder = vault / candidate
+            break
+    target = folder / "Keyboard Shortcuts (Hotkey HQ).md"
+    try:
+        target.write_text(markdown, encoding="utf-8")
+    except Exception as e:
+        return False, "could not write %s: %s" % (target, e)
+    log("exported cheat sheet to %s" % target)
+    return True, str(target)
+
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "HotkeyHQ/" + VERSION
@@ -407,6 +575,17 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(200, {"installed": False, "shortcuts": [], "skipped": 0,
                                       "error": str(e)})
 
+        elif self.path == "/api/obsidian":
+            try:
+                rows, vault = read_obsidian()
+                self._send_json(200, {"installed": vault is not None,
+                                      "vault": vault, "shortcuts": rows})
+            except Exception as e:
+                log("obsidian read failed: %s" % e)
+                self._send_json(200, {"installed": False, "vault": None,
+                                      "shortcuts": [], "error": str(e)})
+            return
+
         elif self.path == "/api/terminal":
             try:
                 self._send_json(200, {"bindings": read_terminal()})
@@ -419,7 +598,9 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- POST ---------------------------------------------------------------
     def do_POST(self):
-        if self.path not in ("/api/assign", "/api/unassign"):
+        if self.path not in ("/api/assign", "/api/unassign",
+                             "/api/powertoys/rebind", "/api/powertoys/restart",
+                             "/api/export/obsidian"):
             self.send_response(404); self.end_headers(); return
         if not self._authorised():
             return
@@ -432,9 +613,40 @@ class Handler(BaseHTTPRequestHandler):
         if length > MAX_BODY:
             self._send_json(413, {"ok": False, "error": "request too large"})
             return
+        raw = self.rfile.read(length) if length else b"{}"
+
+        # ---- PowerToys conflict resolver ----
+        if self.path == "/api/powertoys/restart":
+            ok, msg = restart_powertoys()
+            self._send_json(200 if ok else 500, {"ok": ok, "message": msg})
+            return
+
+        if self.path == "/api/powertoys/rebind":
+            try:
+                d = json.loads(raw)
+                ok, msg = rebind_powertoys(d["module"], d["prop"], d["combo"])
+            except Exception as e:
+                self._send_json(400, {"ok": False, "error": "bad request: %s" % e})
+                return
+            self._send_json(200 if ok else 400,
+                            {"ok": ok, "message": msg,
+                             "note": "PowerToys reads its hotkeys at module start, "
+                                     "so restart PowerToys for this to take effect."})
+            return
+
+        # ---- Obsidian cheat sheet ----
+        if self.path == "/api/export/obsidian":
+            try:
+                d = json.loads(raw)
+                ok, msg = export_obsidian(d.get("markdown", ""))
+            except Exception as e:
+                self._send_json(400, {"ok": False, "error": "bad request: %s" % e})
+                return
+            self._send_json(200 if ok else 500, {"ok": ok, "message": msg})
+            return
 
         try:
-            data = json.loads(self.rfile.read(length))
+            data = json.loads(raw)
             context = data["context"]
             keystroke = data["keystroke"]
             action = data.get("action")
