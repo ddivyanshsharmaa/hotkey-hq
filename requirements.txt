@@ -1,3 +1,7 @@
-# Pinned to a major version: an unpinned install would silently pick up a future
-# breaking release of pywebview on some machine months from now.
-pywebview>=5.0,<6.0
+# Bounded so an install months from now cannot silently pick up a future
+# breaking major release. The upper bound covers 6.x deliberately: this app is
+# developed and tested against 6.2.1, and a <6.0 pin would have shipped everyone
+# a 5.x build that no one had ever run it on. Both lines were checked to expose
+# the same create_window signature and the same WebView2 setting capture mode
+# relies on (AreBrowserAcceleratorKeysEnabled), so either works.
+pywebview>=5.0,<7.0
