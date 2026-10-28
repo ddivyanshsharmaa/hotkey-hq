@@ -1,5 +1,6 @@
 # Local environment and runtime artifacts — never published.
 .venv/
+.cache/
 __pycache__/
 *.pyc
 

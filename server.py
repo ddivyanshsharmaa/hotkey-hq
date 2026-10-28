@@ -27,6 +27,8 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from platform_config import config_paths, parse_kitty, read_terminals
+
 APP_ID = "hotkey-hq"
 VERSION = "1.0.0"
 # The built-in shortcut table is a hand-maintained snapshot. Stamp it so a stale
@@ -39,6 +41,9 @@ MAX_BODY = 64 * 1024
 
 ROOT = Path(__file__).resolve().parent
 HOME = Path.home()
+PLATFORM = "windows" if sys.platform == "win32" else "macos" if sys.platform == "darwin" else "linux"
+IS_WINDOWS = sys.platform == "win32"
+NATIVE_PATHS = {} if IS_WINDOWS else config_paths(sys.platform, HOME)
 KEYBINDINGS_PATH = HOME / ".claude" / "keybindings.json"
 POWERTOYS_DIR = HOME / "AppData" / "Local" / "Microsoft" / "PowerToys"
 VSCODE_KEYBINDINGS = HOME / "AppData" / "Roaming" / "Code" / "User" / "keybindings.json"
@@ -48,6 +53,12 @@ WT_SETTINGS = [
     HOME / "AppData" / "Local" / "Packages" /
     "Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe" / "LocalState" / "settings.json",
 ]
+OBSIDIAN_REGISTRY = HOME / "AppData" / "Roaming" / "obsidian" / "obsidian.json"
+if not IS_WINDOWS:
+    KEYBINDINGS_PATH = NATIVE_PATHS["claude"]
+    VSCODE_KEYBINDINGS = NATIVE_PATHS["vscode"]
+    OBSIDIAN_REGISTRY = NATIVE_PATHS["obsidian"]
+    WT_SETTINGS = []
 
 # A page served by this server carries this token in a meta tag, and every API
 # call must present it. Without it, any website open in any browser could POST to
@@ -206,6 +217,8 @@ def _node_from_combo(combo):
 
 def rebind_powertoys(module, prop, combo):
     """Point one PowerToys hotkey at a new combination. Returns (ok, message)."""
+    if not IS_WINDOWS:
+        return False, "PowerToys is only available on Windows"
     target = POWERTOYS_DIR / module / "settings.json"
     if not target.is_file():
         return False, "no settings file for module %r" % module
@@ -237,6 +250,8 @@ def rebind_powertoys(module, prop, combo):
 def restart_powertoys():
     """PowerToys reads most hotkeys at module start, so a file edit alone is not
     reliably picked up. Returns (ok, message)."""
+    if not IS_WINDOWS:
+        return False, "PowerToys is only available on Windows"
     exe = HOME / "AppData" / "Local" / "PowerToys" / "PowerToys.exe"
     if not exe.is_file():
         return False, "PowerToys.exe not found at %s" % exe
@@ -273,7 +288,7 @@ def powertoys_enabled():
 def read_powertoys():
     """The user's live PowerToys hotkeys, skipping modules they have switched off.
     Returns ([], 0) if PowerToys isn't installed."""
-    if not POWERTOYS_DIR.is_dir():
+    if not IS_WINDOWS or not POWERTOYS_DIR.is_dir():
         return [], 0
     enabled = powertoys_enabled()
     out, seen, skipped = [], set(), 0
@@ -371,6 +386,8 @@ def _wt_combo(keys):
 def read_terminal():
     """The user's Windows Terminal key bindings — both the current `keybindings`
     schema and the older `actions` one, whichever their settings file uses."""
+    if not IS_WINDOWS:
+        return read_terminals(NATIVE_PATHS)[0]
     for path in WT_SETTINGS:
         data = _read_jsonc(path)
         if not isinstance(data, dict):
@@ -408,6 +425,10 @@ def _tracked_files():
         "claude": KEYBINDINGS_PATH,
         "vscode": VSCODE_KEYBINDINGS,
     }
+    if not IS_WINDOWS:
+        # iTerm2 preferences may be binary plists; the text snapshot format
+        # deliberately covers only kitty, Claude, VS Code and Obsidian here.
+        files["kitty"] = NATIVE_PATHS["kitty"]
     for p in WT_SETTINGS:
         if p.is_file():
             files["terminal"] = p
@@ -415,7 +436,7 @@ def _tracked_files():
     vaults = obsidian_vaults()
     if vaults:
         files["obsidian"] = Path(vaults[0]["path"]) / ".obsidian" / "hotkeys.json"
-    if POWERTOYS_DIR.is_dir():
+    if IS_WINDOWS and POWERTOYS_DIR.is_dir():
         for f in sorted(POWERTOYS_DIR.glob("*/settings.json")):
             files["powertoys/" + f.parent.name] = f
     return {k: v for k, v in files.items() if v and v.is_file()}
@@ -556,6 +577,10 @@ def history():
         """Rebuild the shortcut map from a snapshot's stored file text."""
         m = {}
         for label, text in (snap.get("files") or {}).items():
+            if label == "kitty":
+                for row in parse_kitty(text)[0]:
+                    m["kitty " + row["action"]] = row["combo"]
+                continue
             try:
                 data = json.loads(_strip_jsonc(text) or "{}")
             except Exception:
@@ -613,7 +638,7 @@ def history():
 def obsidian_vaults():
     """Obsidian keeps a registry of every vault, so we never hardcode a path.
     Most-recently-opened first."""
-    reg = _read_jsonc(HOME / "AppData" / "Roaming" / "obsidian" / "obsidian.json")
+    reg = _read_jsonc(OBSIDIAN_REGISTRY)
     if not isinstance(reg, dict):
         return []
     vaults = reg.get("vaults")
@@ -631,6 +656,8 @@ def obsidian_vaults():
 # Obsidian writes "Mod", which is Ctrl on Windows and Cmd on macOS.
 OBS_MOD = {"mod": "ctrl", "ctrl": "ctrl", "control": "ctrl",
            "alt": "alt", "shift": "shift", "meta": "win"}
+if PLATFORM == "macos":
+    OBS_MOD.update({"mod": "win", "cmd": "win", "command": "win", "option": "alt"})
 
 
 def read_obsidian():
@@ -729,7 +756,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             html = (html.replace("__HKHQ_TOKEN__", TOKEN)
                         .replace("__HKHQ_VERSION__", VERSION)
-                        .replace("__HKHQ_VERIFIED__", VERIFIED_AGAINST))
+                        .replace("__HKHQ_VERIFIED__", VERIFIED_AGAINST)
+                        .replace("__HKHQ_PLATFORM__", PLATFORM)
+                        .replace("/*__HKHQ_PLATFORM_DATA__*/", "" if IS_WINDOWS else
+                                 (ROOT / "platform_data.js").read_text(encoding="utf-8")))
             body = html.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -783,7 +813,7 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/powertoys":
             try:
                 shortcuts, skipped = read_powertoys()
-                self._send_json(200, {"installed": POWERTOYS_DIR.is_dir(),
+                self._send_json(200, {"installed": IS_WINDOWS and POWERTOYS_DIR.is_dir(),
                                       "shortcuts": shortcuts, "skipped": skipped})
             except Exception as e:
                 log("powertoys read failed: %s" % e)
@@ -815,7 +845,11 @@ class Handler(BaseHTTPRequestHandler):
 
         elif self.path == "/api/terminal":
             try:
-                self._send_json(200, {"bindings": read_terminal()})
+                if IS_WINDOWS:
+                    self._send_json(200, {"bindings": read_terminal()})
+                else:
+                    rows, notes = read_terminals(NATIVE_PATHS)
+                    self._send_json(200, {"bindings": rows, "notes": notes})
             except Exception as e:
                 log("windows terminal read failed: %s" % e)
                 self._send_json(200, {"bindings": [], "error": str(e)})
@@ -831,6 +865,10 @@ class Handler(BaseHTTPRequestHandler):
                              "/api/snapshot", "/api/restore"):
             self.send_response(404); self.end_headers(); return
         if not self._authorised():
+            return
+
+        if not IS_WINDOWS and self.path.startswith("/api/powertoys/"):
+            self._send_json(400, {"ok": False, "error": "PowerToys is only available on Windows"})
             return
 
         try:
@@ -1096,7 +1134,7 @@ def main():
     except ImportError:
         fatal("Setup incomplete",
               "The pywebview package is missing, so the window cannot open.\n\n"
-              "Run setup.bat once in:\n%s" % ROOT)
+              "Run %s once in:\n%s" % ("setup.bat" if IS_WINDOWS else "bash setup.sh", ROOT))
         return
 
     webview.create_window(
@@ -1106,7 +1144,10 @@ def main():
         height=920,
         min_size=(640, 480),
     )
-    webview.start()
+    if IS_WINDOWS:
+        webview.start()
+    else:
+        webview.start(gui="cocoa" if PLATFORM == "macos" else "gtk")
 
 
 if __name__ == "__main__":

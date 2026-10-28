@@ -10,6 +10,7 @@
 <meta name="hkhq-token" content="__HKHQ_TOKEN__">
 <meta name="hkhq-version" content="__HKHQ_VERSION__">
 <meta name="hkhq-verified" content="__HKHQ_VERIFIED__">
+<meta name="hkhq-platform" content="__HKHQ_PLATFORM__">
 <link rel="icon" href="/icon.ico">
 <style>
   @media (prefers-reduced-motion: reduce) {
@@ -423,7 +424,7 @@
 
   <div class="callout" id="ptClash" style="display:none; border-left-color:var(--L-powertoys);"></div>
 
-  <div class="callout">
+  <div class="callout" id="platformNotes">
     <h3>Windows &amp; PowerShell realities</h3>
     <ul>
       <li><strong>Capture mode has a hard ceiling.</strong> While it's on, this window swallows every shortcut it can reach and explains it instead of running it — including the browser-level ones like <code>Ctrl+S</code> and <code>Ctrl+P</code>, and page zoom. What it <em>cannot</em> reach is anything Windows claims first: <code>Win+</code> anything, <code>Alt+Tab</code>, <code>Alt+F4</code>, <code>Ctrl+Alt+Del</code>, <code>Ctrl+Shift+Esc</code>. Those never reach any app, so they're listed below but can't be live-tested. Intercepting them would need a system-wide keyboard hook, which is exactly how keyloggers work — not worth it for a reference tool.</li>
@@ -442,6 +443,7 @@
 </div>
 
 <script>
+/*__HKHQ_PLATFORM_DATA__*/
 (function () {
   "use strict";
 
@@ -457,6 +459,8 @@
   var TOKEN = meta('hkhq-token');
   var VERSION = meta('hkhq-version');
   var VERIFIED = meta('hkhq-verified');
+  var PLATFORM = meta('hkhq-platform') || 'windows';
+  var NATIVE = PLATFORM !== 'windows' && typeof HKHQPlatform !== 'undefined' ? HKHQPlatform : null;
 
   function api(path, options) {
     var opt = options || {};
@@ -710,6 +714,11 @@
   ];
 
   var CUSTOM = [];   // loaded from keybindings.json
+  if (NATIVE) {
+    DATA = NATIVE.defaults(DATA);
+    LAYERS.windows.name = NATIVE.osName;
+    LAYER_ORDER = LAYER_ORDER.filter(function(l){ return NATIVE.hidden.indexOf(l) < 0; });
+  }
 
   var CONTEXTS = ['Global','Chat','Task','Autocomplete','Confirmation','Help','Transcript','HistorySearch',
     'ThemePicker','Settings','Tabs','Attachments','Footer','MessageSelector','DiffDialog','ModelPicker','Select','Plugin','Scroll'];
@@ -883,6 +892,11 @@
                 'so no application — including this one — can see or rebind them.';
 
   var layoutId = store('hotkeyhq-layout') || 'laptop-numpad';
+  if (NATIVE) {
+    NATIVE.prepare(LAYOUTS);
+    FN_NOTE = NATIVE.fnNote;
+    layoutId = store('hotkeyhq-layout') || 'laptop';
+  }
   var hasFn = store('hotkeyhq-fn');
   hasFn = hasFn === null || hasFn === undefined ? true : hasFn === '1';
   function ROWS() { return (LAYOUTS[layoutId] || LAYOUTS['laptop-numpad']).rows; }
@@ -900,11 +914,13 @@
   });
   var MODCODE = { ControlLeft:'ctrl',ControlRight:'ctrl',AltLeft:'alt',AltRight:'alt',
                   ShiftLeft:'shift',ShiftRight:'shift',MetaLeft:'win',MetaRight:'win' };
+  if (NATIVE) Object.assign(CODE, {PageUp:'pageup', PageDown:'pagedown', Insert:'insert'});
   var CAPS = { escape:'Esc', tab:'Tab', enter:'Enter', backspace:'Backspace', space:'Space', delete:'Del',
                home:'Home', end:'End', up:'↑', down:'↓', left:'←', right:'→', capslock:'CapsLock' };
   var MODORDER = ['ctrl','alt','shift','win'];
 
   function normalise(step) {
+    if (NATIVE) return NATIVE.normalise(step);
     var parts = step.toLowerCase().split('+');
     var base = parts.pop();
     var mods = MODORDER.filter(function(m){ return parts.indexOf(m) >= 0; });
@@ -913,11 +929,14 @@
   function baseOf(step){ var p = step.split('+'); return p[p.length-1]; }
   function pretty(step) {
     var parts = step.split('+'); var base = parts.pop();
-    var mods = parts.map(function(m){ return m==='ctrl'?'Ctrl':m==='alt'?'Alt':m==='shift'?'Shift':m==='win'?'Win':m; });
+    var mods = parts.map(function(m){ return NATIVE ? NATIVE.modLabel(m) : m==='ctrl'?'Ctrl':m==='alt'?'Alt':m==='shift'?'Shift':m==='win'?'Win':m; });
     var b = CAPS[base] || (base.length===1 ? base.toUpperCase() : base.charAt(0).toUpperCase()+base.slice(1));
     return mods.concat(b).join('+');
   }
   function prettyCombo(combo){ return combo.split(' ').map(pretty).join(' then '); }
+  function fromConfig(combo, target) {
+    return NATIVE ? NATIVE.fromConfig(combo, target) : combo.split(' ').map(normalise).join(' ');
+  }
 
   /* ============ index ============ */
   var INDEX = {};
@@ -1159,6 +1178,7 @@
     ShiftLeft:'Left Shift', ShiftRight:'Right Shift',
     MetaLeft:'Left Win', MetaRight:'Right Win'
   };
+  if (NATIVE) NATIVE.physicalNames(PHYS_NAME);
   function physName(code) {
     if (PHYS_NAME[code]) return PHYS_NAME[code];
     var b = CODE[code];
@@ -1172,7 +1192,7 @@
     if (!CODE[e.code] && !MODCODE[e.code]) {
       notes += ' <span class="probe-warn">— no name for this code, so it is ignored</span>';
     }
-    if (e.code === 'AltRight' && e.ctrlKey) {
+    if ((!NATIVE || !NATIVE.mac) && e.code === 'AltRight' && e.ctrlKey) {
       notes += ' <span class="probe-warn">— AltGr: Windows fakes a Ctrl alongside it; ignored here</span>';
     }
     if (e.repeat) notes += ' <span class="off">(held)</span>';
@@ -1186,7 +1206,7 @@
       flag('ctrl', heldCodes['ControlLeft'] || heldCodes['ControlRight']) + ' ' +
       flag('alt', heldCodes['AltLeft'] || heldCodes['AltRight']) + ' ' +
       flag('shift', heldCodes['ShiftLeft'] || heldCodes['ShiftRight']) + ' ' +
-      flag('win', heldCodes['MetaLeft'] || heldCodes['MetaRight']) +
+      flag(NATIVE ? NATIVE.modLabel('win') : 'win', heldCodes['MetaLeft'] || heldCodes['MetaRight']) +
       (down.length ? ' &nbsp;·&nbsp; holding: <b>' + esc(down.join(' + ')) + '</b>' : '') +
       notes;
   }, false);
@@ -1229,7 +1249,7 @@
     if (e.code === 'ControlLeft') ctrlLeftAt = e.timeStamp;
     // AltGr arrives as ControlLeft immediately followed by AltRight. A human
     // pressing Ctrl then right-Alt takes far longer than 60ms.
-    if (e.code === 'AltRight' && heldCodes['ControlLeft'] && (e.timeStamp - ctrlLeftAt) < 60) {
+    if ((!NATIVE || !NATIVE.mac) && e.code === 'AltRight' && heldCodes['ControlLeft'] && (e.timeStamp - ctrlLeftAt) < 60) {
       altGr = true;
       delete heldCodes['ControlLeft'];
     }
@@ -1269,6 +1289,7 @@
   });
 
   function showFnExplainer() {
+    if (NATIVE) { tone('none'); ro.innerHTML = NATIVE.fnExplainer; return; }
     tone('none');
     ro.innerHTML =
       '<p class="ro-combo">Fn</p>' +
@@ -1306,7 +1327,7 @@
     if (!list.length) {
       tone('none');
       ro.innerHTML = '<p class="ro-combo">' + esc(label) + '</p>' +
-        '<p class="ro-sub">Nothing in the layers you have enabled uses this key. Every combo on it is free.</p>' +
+        '<p class="ro-sub">' + (NATIVE ? NATIVE.freeNote : 'Nothing in the layers you have enabled uses this key. Every combo on it is free.') + '</p>' +
         '<div class="ro-actions"><button class="btn" data-act="idle">Close</button></div>';
       return;
     }
@@ -1333,7 +1354,7 @@
         : esc(steps[0]);
       html += '<div class="kv-row"><div class="kv-combo">' + comboHtml + '</div><div class="kv-claims">';
       claims.forEach(function (h, i) {
-        var beaten = i > 0 && (claims[0].l === 'powertoys' || claims[0].l === 'windows');
+        var beaten = i > 0 && (claims[0].l === 'powertoys' || (!NATIVE && claims[0].l === 'windows'));
         html += '<div class="kv-claim' + (i > 0 ? ' loses' : '') + '">' +
           '<span class="lchip" data-l="'+h.l+'">'+LAYERS[h.l].name+'</span>' +
           '<span class="body"><span class="what">'+esc(h.t)+'</span>' +
@@ -1379,7 +1400,7 @@
     });
     html += '</ul>';
     if (osHit) {
-      html += '<p class="ro-wins-note">Windows intercepts this before any app sees it — the other layers never fire.</p>';
+      html += '<p class="ro-wins-note">' + (NATIVE ? 'This is a platform reference shortcut. The OS or native window may intercept it before the page; your settings can override the default.' : 'Windows intercepts this before any app sees it — the other layers never fire.') + '</p>';
     } else if (hits.length > 1) {
       html += '<p class="ro-wins-note">Top row wins while Claude\'s prompt box has focus. Click into the editor and the VS Code binding takes over instead.</p>';
     }
@@ -1401,7 +1422,7 @@
 
     var sub;
     if (freeText) sub = freeText;
-    else if (!claimed) sub = "Nothing claims this — not Claude Code, VS Code, Windows, PowerToys or your own bindings. It's free.";
+    else if (!claimed) sub = NATIVE ? NATIVE.freeNote : "Nothing claims this — not Claude Code, VS Code, Windows, PowerToys or your own bindings. It's free.";
     else sub = 'Already used by ' + esc(hits.map(function(h){ return LAYERS[h.l].name + ' (' + h.t + ')'; }).join('; ')) +
                '. Binding it below only changes that one app.';
 
@@ -1491,7 +1512,7 @@
     target = target || 'claude';
     api('/api/assign', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ context:ctx, keystroke:combo, action:action,
+      body: JSON.stringify({ context:ctx, keystroke:NATIVE ? NATIVE.forConfig(combo, target) : combo, action:action,
                              force:!!force, target:target, when:when || '' })
     }).then(function (res) {
       if (res.status === 409) {
@@ -1509,7 +1530,7 @@
         if (d.ok) {
           CUSTOM = CUSTOM.filter(function(e){ return !(e.c === combo && e.target === target); });
           CUSTOM.push({ c:combo, l: target === 'vscode' ? 'vscode' : 'custom', t:action,
-                        ctx:ctx, raw:combo, target:target, mine:true,
+                        ctx:ctx, raw:NATIVE ? NATIVE.forConfig(combo, target) : combo, target:target, mine:true,
                         n: target === 'vscode' ? 'your VS Code binding' : 'your binding · context '+ctx });
           indexAll(); paintKeyboard(); renderTable(); refreshFilterCounts();
           showResult(combo, 'Bound to ' + action + ' and written to ' + d.path + '.', true);
@@ -1579,7 +1600,7 @@
           ro.innerHTML = '<p class="ro-combo">' + (d.ok ? 'Restored' : 'Restore failed') + '</p>' +
             '<p class="ro-sub">' + esc(d.ok
               ? 'Put back: ' + ((d.detail && d.detail.restored) || []).join(', ') +
-                '. Reload the app to see it, and restart PowerToys if any of its hotkeys changed.'
+                (NATIVE ? '. Reload the app and affected applications to see the restored bindings.' : '. Reload the app to see it, and restart PowerToys if any of its hotkeys changed.')
               : JSON.stringify(d.detail || d.error)) + '</p>' +
             '<div class="ro-actions"><button class="btn" data-act="idle">Close</button></div>';
         })
@@ -1590,7 +1611,7 @@
     if (act === 'pickfree') {
       var fc = b.getAttribute('data-combo');
       tone('custom');
-      assignForm(fc, [], 'Free on this machine — nothing claims it. Pick where it should live.');
+      assignForm(fc, [], NATIVE ? NATIVE.freeNote : 'Free on this machine — nothing claims it. Pick where it should live.');
       return;
     }
 
@@ -1602,7 +1623,7 @@
         body: JSON.stringify({ context: rctx, keystroke: rc, target: rtarget })
       }).then(function(r){ return r.json(); }).then(function (d) {
         if (!d.ok) { showResult(rc, 'Could not remove: ' + (d.error||'unknown'), false); return; }
-        var norm = rc.split(' ').map(normalise).join(' ');
+        var norm = fromConfig(rc, rtarget);
         CUSTOM = CUSTOM.filter(function(e){ return !(e.c === norm && (e.target||'claude') === rtarget); });
         indexAll(); paintKeyboard(); renderTable(); refreshFilterCounts();
         showResult(norm, d.removed ? 'Removed from ' + d.path + '.' : 'It was not in your keybindings file.', true);
@@ -1726,7 +1747,7 @@
       return;
     }
     ro.innerHTML = '<p class="ro-combo">' + free.length + ' free combinations</p>' +
-      '<p class="ro-sub">Nothing on this machine claims these — not Claude Code, VS Code, Windows, PowerToys, your shell, or your own bindings. Click one to bind it.</p>' +
+      '<p class="ro-sub">' + (NATIVE ? NATIVE.freeNote : 'Nothing on this machine claims these — not Claude Code, VS Code, Windows, PowerToys, your shell, or your own bindings. Click one to bind it.') + '</p>' +
       '<div class="ro-actions">' + free.map(function (c) {
         return '<button class="btn" data-act="pickfree" data-combo="'+c+'">'+esc(pretty(c))+'</button>';
       }).join('') + '</div>' +
@@ -1854,9 +1875,7 @@
     api('/api/snapshots').then(function (r) { return r.json(); }).then(function (d) {
       var s = d.snapshots || [];
       var html = '<p class="ro-combo">Backups</p>' +
-        '<p class="ro-sub">Every keybinding file on this machine — Claude Code, VS Code, PowerToys, ' +
-        'Windows Terminal and Obsidian — copied together. Restoring takes a snapshot of the current ' +
-        'state first, so it is itself undoable.</p>' +
+        '<p class="ro-sub">' + (NATIVE ? 'Backups cover Claude Code, VS Code, kitty.conf and the most recent Obsidian vault. iTerm2 preferences are read-only and excluded. Restoring first backs up the current state.' : 'Every keybinding file on this machine — Claude Code, VS Code, PowerToys, Windows Terminal and Obsidian — copied together. Restoring takes a snapshot of the current state first, so it is itself undoable.') + '</p>' +
         '<div class="ro-actions"><button class="btn primary" data-act="snapnow">Back up now</button>' +
         '<button class="btn" data-act="idle">Close</button></div>';
       if (s.length) {
@@ -2072,6 +2091,7 @@
   });
 
   /* ============ boot ============ */
+  if (NATIVE) NATIVE.describe();
   indexAll(); buildFilters(); buildKeyboard(); renderTable(); syncBoardNote();
 
   var verifiedEl = document.getElementById('verifiedNote');
@@ -2088,7 +2108,7 @@
       Object.keys(bindings).forEach(function (ks) {
         var action = bindings[ks];
         if (action === null) return;
-        CUSTOM.push({ c: ks.split(' ').map(normalise).join(' '), l:'custom', t:action,
+        CUSTOM.push({ c: fromConfig(ks, 'claude'), l:'custom', t:action,
                       ctx: block.context, raw: ks,
                       n:'your binding · context ' + block.context });
       });
@@ -2101,12 +2121,12 @@
   api('/api/vscode').then(function(r){ return r.ok ? r.json() : null; }).then(function (v) {
     if (!v) return;
     (v.removals || []).forEach(function (r) {
-      if (r && r.key) SUPPRESSED[String(r.key).split(' ').map(normalise).join(' ')] = true;
+      if (r && r.key) SUPPRESSED[fromConfig(String(r.key), 'vscode')] = true;
     });
     (v.bindings || []).forEach(function (b) {
       if (!b || !b.key || !b.command) return;
       CUSTOM.push({
-        c: String(b.key).split(' ').map(normalise).join(' '),
+        c: fromConfig(String(b.key), 'vscode'),
         l: 'vscode', t: b.command, target: 'vscode', mine: true, raw: b.key,
         n: 'your VS Code binding' + (b.when ? ' · when ' + b.when : '')
       });
@@ -2116,12 +2136,13 @@
 
   // The user's own Windows Terminal bindings, on the Terminal layer.
   api('/api/terminal').then(function(r){ return r.ok ? r.json() : null; }).then(function (t) {
+    if (NATIVE && t) NATIVE.terminalNotes(t.notes || []);
     if (!t || !t.bindings || !t.bindings.length) return;
     t.bindings.forEach(function (b) {
       CUSTOM.push({
         c: String(b.combo).split(' ').map(normalise).join(' '),
         l: 'shell', t: b.action,
-        n: 'your Windows Terminal binding'
+        n: NATIVE ? 'saved ' + (b.source || 'terminal') + ' override (profile may be inactive)' : 'your Windows Terminal binding'
       });
     });
     indexAll(); paintKeyboard(); renderTable(); refreshFilterCounts();
@@ -2130,11 +2151,13 @@
   // The user's customised Obsidian hotkeys. Obsidian stores overrides only,
   // so anything left at its factory binding is covered by the table above.
   api('/api/obsidian').then(function (o) {
+    return NATIVE ? (o.ok ? o.json() : null) : o;
+  }).then(function (o) {
     if (!o || !o.shortcuts || !o.shortcuts.length) return;
     o.shortcuts.forEach(function (s) {
       CUSTOM.push({
         c: s.combo.split(' ').map(normalise).join(' '),
-        l: 'obsidian', t: s.action, mine: true,
+        l: 'obsidian', t: s.action, mine: !NATIVE,
         n: 'your Obsidian binding · ' + s.command
       });
     });
@@ -2143,7 +2166,7 @@
 
   // Live PowerToys hotkeys, read from the user's own settings. Modules they have
   // switched off are left out by the server — a disabled module presses nothing.
-  api('/api/powertoys').then(function(r){ return r.ok ? r.json() : null; }).then(function (pt) {
+  if (!NATIVE) api('/api/powertoys').then(function(r){ return r.ok ? r.json() : null; }).then(function (pt) {
     if (!pt) return;
     ptSkipped = pt.skipped || 0;
     if (!pt.shortcuts || !pt.shortcuts.length) return;
