@@ -1,4 +1,21 @@
-# Hotkey HQ
+<div align="center">
+
+# ⌨️ Hotkey HQ
+
+**Who is eating this key?**
+See every keyboard shortcut that competes for a key on your machine (Claude Code, VS Code, the OS, terminal apps, PowerToys and your own bindings) on one keyboard you can press keys against.
+
+[![License](https://img.shields.io/github/license/ddivyanshsharmaa/hotkey-hq?style=flat-square)](LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/ddivyanshsharmaa/hotkey-hq?style=flat-square)](https://github.com/ddivyanshsharmaa/hotkey-hq/commits)
+[![Stars](https://img.shields.io/github/stars/ddivyanshsharmaa/hotkey-hq?style=flat-square)](https://github.com/ddivyanshsharmaa/hotkey-hq/stargazers)
+![Platform](https://img.shields.io/badge/Windows-stable-blue?style=flat-square)
+![macOS and Linux](https://img.shields.io/badge/macOS%20%7C%20Linux-beta-lightgrey?style=flat-square)
+
+<img src="docs/social-preview.png" alt="Hotkey HQ: Who is eating this key?" width="760">
+
+[Windows setup](#windows-setup) · [What it does](#what-it-does) · [Privacy and safety](#privacy-and-safety)
+
+</div>
 
 Every keyboard shortcut competing for a key on your machine — Claude Code,
 VS Code, the operating system, terminal apps, and your own bindings — on a
@@ -12,6 +29,13 @@ platform reference, not an exhaustive scan of installed apps or OS settings.
 
 It answers the question you actually have when a shortcut misbehaves: **who is
 eating this key?**
+
+## When to reach for it
+
+- A shortcut stopped working and you do not know which app grabbed it.
+- You want a **free key combination** that nothing on your machine claims.
+- You use PowerToys and suspect it is **shadowing an app shortcut**.
+- You want to assign or remove **VS Code or Claude Code keybindings** and see conflicts first.
 
 ## Windows setup
 
@@ -279,3 +303,7 @@ is installed into your own `.venv` rather than bundled here.
 The shortcut *defaults* tables are a hand-compiled reference to what Windows,
 VS Code, Claude Code, PowerToys and the rest ship with. Those product names
 belong to their owners and appear here only to say whose shortcut is whose.
+
+---
+
+If this saved you time, a ⭐ on the repo helps other people find it.
